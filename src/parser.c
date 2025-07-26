@@ -86,14 +86,40 @@ parsed_command_t* parse_command(const char* line) {
         return NULL;
     }
     
-    // Tokenize the command line
-    char* token = strtok(trimmed, " \t");
+    // Parse arguments, handling quoted strings
+    char* pos = trimmed;
     int token_count = 0;
     
-    while (token && token_count < 16) {
-        cmd->args[token_count] = strdup(token);
+    while (*pos && token_count < 16) {
+        // Skip whitespace
+        while (*pos && isspace(*pos)) pos++;
+        if (!*pos) break;
+        
+        char* token_start = pos;
+        
+        // Handle quoted strings
+        if (*pos == '"' || *pos == '\'') {
+            char quote = *pos++;
+            token_start = pos; // Start after opening quote
+            
+            // Find closing quote
+            while (*pos && *pos != quote) pos++;
+            
+            if (*pos == quote) {
+                *pos = '\0'; // Null terminate the string
+                pos++; // Move past closing quote
+            }
+        } else {
+            // Regular token - find end
+            while (*pos && !isspace(*pos)) pos++;
+            if (*pos) {
+                *pos = '\0';
+                pos++;
+            }
+        }
+        
+        cmd->args[token_count] = strdup(token_start);
         token_count++;
-        token = strtok(NULL, " \t");
     }
     
     cmd->arg_count = token_count;

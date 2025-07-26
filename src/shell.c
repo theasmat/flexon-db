@@ -141,6 +141,8 @@ static int cmd_shell_use(shell_session_t* session, const parsed_command_t* cmd);
 static int cmd_shell_info(shell_session_t* session, const parsed_command_t* cmd);
 static int cmd_shell_schema(shell_session_t* session, const parsed_command_t* cmd);
 static int cmd_shell_clear(shell_session_t* session, const parsed_command_t* cmd);
+static int cmd_shell_create(shell_session_t* session, const parsed_command_t* cmd);
+static int cmd_shell_count(shell_session_t* session, const parsed_command_t* cmd);
 
 /**
  * Execute a shell command
@@ -180,6 +182,14 @@ int execute_shell_command(shell_session_t* session, const parsed_command_t* cmd)
             
         case CMD_CLEAR:
             result = cmd_shell_clear(session, cmd);
+            break;
+            
+        case CMD_CREATE:
+            result = cmd_shell_create(session, cmd);
+            break;
+            
+        case CMD_COUNT:
+            result = cmd_shell_count(session, cmd);
             break;
             
         case CMD_EXIT:
@@ -224,7 +234,7 @@ static int cmd_shell_help(shell_session_t* session, const parsed_command_t* cmd)
         {"create <db> schema=\"...\"", "Create a new database"},
         {"drop <database>", "Delete a database (not implemented)"},
         {"select * [limit N]", "Read rows from current database (not implemented)"},
-        {"count", "Show row count for current database (not implemented)"},
+        {"count", "Show row count for current database"},
         {"insert field=value ...", "Insert a row (not implemented)"},
         {"export [csv|json]", "Export data (not implemented)"},
         {"info", "Show current database information"},
@@ -522,6 +532,170 @@ static int cmd_shell_clear(shell_session_t* session, const parsed_command_t* cmd
     
     // Clear screen using ANSI escape codes
     printf("\033[2J\033[H");
+    return 0;
+}
+
+/**
+ * Create command implementation
+ */
+static int cmd_shell_create(shell_session_t* session, const parsed_command_t* cmd) {
+    if (cmd->arg_count < 2) {
+        printf("❌ Usage: create <database> schema=\"field1 type1, field2 type2, ...\"\n");
+        printf("💡 Example: create products.fxdb schema=\"id int32, name string, price float\"\n");
+        return -1;
+    }
+    
+    const char* db_name = cmd->args[1];
+    
+    // Join all arguments after the database name to reconstruct the full command
+    // This handles the case where the schema contains spaces
+    char full_args[1024] = "";
+    for (int i = 2; i < cmd->arg_count; i++) {
+        if (strlen(full_args) > 0) {
+            strcat(full_args, " ");
+        }
+        strcat(full_args, cmd->args[i]);
+    }
+    
+    // Find schema= in the full arguments
+    const char* schema_pos = strstr(full_args, "schema=");
+    if (!schema_pos) {
+        printf("❌ Schema not specified. Use: create <database> schema=\"...\"\n");
+        printf("💡 Example: create products.fxdb schema=\"id int32, name string, price float\"\n");
+        return -1;
+    }
+    
+    const char* schema_str = schema_pos + 7; // Skip "schema="
+    
+    // Remove quotes from schema if present
+    char schema_buffer[1024];
+    if (schema_str[0] == '"' || schema_str[0] == '\'') {
+        strncpy(schema_buffer, schema_str + 1, sizeof(schema_buffer) - 1);
+        schema_buffer[sizeof(schema_buffer) - 1] = '\0';
+        
+        // Remove trailing quote
+        size_t len = strlen(schema_buffer);
+        if (len > 0 && (schema_buffer[len-1] == '"' || schema_buffer[len-1] == '\'')) {
+            schema_buffer[len-1] = '\0';
+        }
+        schema_str = schema_buffer;
+    }
+    
+    // Check if database already exists
+    if (database_exists(session->working_dir, db_name)) {
+        printf("❌ Database already exists: %s\n", db_name);
+        printf("💡 Use 'drop %s' first to remove it (when implemented).\n", db_name);
+        return -1;
+    }
+    
+    // Get full path
+    char* full_path = get_database_path(session->working_dir, db_name);
+    if (!full_path) {
+        printf("❌ Failed to build database path\n");
+        return -1;
+    }
+    
+    printf("🛠️  Creating database: %s\n", db_name);
+    printf("📋 Schema: %s\n\n", schema_str);
+    
+    schema_t* schema = parse_schema(schema_str);
+    if (!schema) {
+        printf("❌ Failed to parse schema\n");
+        printf("💡 Check your schema format: \"field1 type1, field2 type2, ...\"\n");
+        printf("💡 Valid types: int32, float, string, bool\n");
+        free(full_path);
+        return -1;
+    }
+    
+    printf("✅ Parsed schema:\n");
+    print_schema(schema);
+    printf("\n");
+    
+    writer_t* writer = writer_create_default(full_path, schema);
+    if (!writer) {
+        printf("❌ Failed to create database file\n");
+        free_schema(schema);
+        free(full_path);
+        return -1;
+    }
+    
+    if (writer_close(writer) != 0) {
+        printf("❌ Failed to finalize database file\n");
+        writer_free(writer);
+        free_schema(schema);
+        free(full_path);
+        return -1;
+    }
+    
+    writer_free(writer);
+    free_schema(schema);
+    
+    printf("🎉 Database created successfully: %s\n", db_name);
+    
+    // Show file info
+    struct stat st;
+    if (stat(full_path, &st) == 0) {
+        char size_str[32];
+        format_file_size(st.st_size, size_str, sizeof(size_str));
+        printf("📊 File size: %s\n", size_str);
+    }
+    
+    free(full_path);
+    return 0;
+}
+
+/**
+ * Count command implementation
+ */
+static int cmd_shell_count(shell_session_t* session, const parsed_command_t* cmd) {
+    (void)cmd; // Unused parameter
+    
+    if (strlen(session->current_db) == 0) {
+        printf("❌ No database selected. Use 'use <database>' first.\n");
+        return -1;
+    }
+    
+    char* full_path = get_database_path(session->working_dir, session->current_db);
+    if (!full_path) {
+        printf("❌ Failed to get database path\n");
+        return -1;
+    }
+    
+    reader_t* reader = reader_open(full_path);
+    if (!reader) {
+        printf("❌ Failed to open database: %s\n", session->current_db);
+        free(full_path);
+        return -1;
+    }
+    
+    uint32_t total_rows = reader_get_row_count(reader);
+    
+    printf("📊 Row Count: %s\n", session->current_db);
+    printf("═════════════════════════════\n\n");
+    
+    const char* headers[] = {"Property", "Value"};
+    int column_widths[] = {15, 20};
+    
+    print_table_header(headers, 2, column_widths);
+    
+    // Total rows
+    char rows_str[32];
+    snprintf(rows_str, sizeof(rows_str), "%u", total_rows);
+    const char* row1[] = {"Total Rows", rows_str};
+    print_table_row(row1, 2, column_widths);
+    
+    // Database name
+    const char* row2[] = {"Database", session->current_db};
+    print_table_row(row2, 2, column_widths);
+    
+    print_table_footer(2, column_widths);
+    
+    if (total_rows == 0) {
+        printf("\n💡 Database is empty. Use 'insert' command to add data (when implemented).\n");
+    }
+    
+    reader_close(reader);
+    free(full_path);
     return 0;
 }
 
