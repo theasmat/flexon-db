@@ -4,6 +4,7 @@
 #include "../../include/reader.h"
 #include "../../include/shell.h"
 #include "../../include/welcome.h"
+#include "../../include/io_utils.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -71,28 +72,36 @@ int create_directory(const char *path)
     return -1;
 }
 
-// Helper function to build full file path
+// Helper function to build full file path with .fxdb extension normalization
 char *build_file_path(const char *directory, const char *filename)
 {
     if (!filename)
         return NULL;
 
+    // First normalize the filename to ensure .fxdb extension
+    char* normalized_filename = fxdb_normalize_filename(filename);
+    if (!normalized_filename)
+        return NULL;
+
     // If no directory specified, use current directory
     if (!directory || strlen(directory) == 0)
     {
-        return strdup(filename);
+        return normalized_filename; // Already allocated by fxdb_normalize_filename
     }
 
     // Build full path
     size_t dir_len = strlen(directory);
-    size_t file_len = strlen(filename);
+    size_t file_len = strlen(normalized_filename);
     size_t total_len = dir_len + file_len + 2; // +2 for '/' and '\0'
 
     char *full_path = malloc(total_len);
-    if (!full_path)
+    if (!full_path) {
+        free(normalized_filename);
         return NULL;
+    }
 
-    snprintf(full_path, total_len, "%s/%s", directory, filename);
+    snprintf(full_path, total_len, "%s/%s", directory, normalized_filename);
+    free(normalized_filename);
     return full_path;
 }
 
@@ -160,14 +169,23 @@ int cmd_list(const char *directory)
     return 0;
 }
 
-// Create command with directory support
+// Create command with directory support and enhanced file handling
 int cmd_create(const char *filename, const char *schema_str, const char *directory)
 {
-    // Build full file path
+    // Build full file path (includes normalization to .fxdb)
     char *full_path = build_file_path(directory, filename);
     if (!full_path)
     {
         printf("❌ Failed to build file path\n");
+        return 1;
+    }
+
+    // Check if file already exists
+    if (fxdb_database_exists(full_path))
+    {
+        printf("❌ Database already exists: %s\n", full_path);
+        printf("💡 Use a different filename or delete the existing database first.\n");
+        free(full_path);
         return 1;
     }
 
@@ -193,8 +211,9 @@ int cmd_create(const char *filename, const char *schema_str, const char *directo
     print_schema(schema);
     printf("\n");
 
-    writer_t *writer = writer_create_default(full_path, schema);
-    if (!writer)
+    // Use enhanced database creation
+    int result = fxdb_database_create(full_path, schema, NULL);
+    if (result != 0)
     {
         printf("❌ Failed to create database file\n");
         free_schema(schema);
@@ -202,16 +221,6 @@ int cmd_create(const char *filename, const char *schema_str, const char *directo
         return 1;
     }
 
-    if (writer_close(writer) != 0)
-    {
-        printf("❌ Failed to finalize database file\n");
-        writer_free(writer);
-        free_schema(schema);
-        free(full_path);
-        return 1;
-    }
-
-    writer_free(writer);
     free_schema(schema);
 
     printf("🎉 Database created successfully: %s\n", full_path);
@@ -227,7 +236,7 @@ int cmd_create(const char *filename, const char *schema_str, const char *directo
     return 0;
 }
 
-// Info command with directory support
+// Info command with directory support and enhanced error handling
 int cmd_info(const char *filename, const char *directory)
 {
     char *full_path = build_file_path(directory, filename);
@@ -237,10 +246,20 @@ int cmd_info(const char *filename, const char *directory)
         return 1;
     }
 
+    // Check if database exists first
+    if (!fxdb_database_exists(full_path))
+    {
+        printf("❌ Database does not exist: %s\n", full_path);
+        printf("💡 Use 'flexon list' to see available databases or 'flexon create' to create a new one.\n");
+        free(full_path);
+        return 1;
+    }
+
     reader_t *reader = reader_open(full_path);
     if (!reader)
     {
         printf("❌ Failed to open database: %s\n", full_path);
+        printf("💡 The file may be corrupted or in an unsupported format.\n");
         free(full_path);
         return 1;
     }

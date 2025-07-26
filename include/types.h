@@ -13,10 +13,50 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <time.h>
+#include <stdbool.h>
 
 /* ============================================================================
- * Basic Database Types
+ * Enhanced Database Types for Performance
  * ============================================================================ */
+
+/**
+ * Enhanced database header structure - optimized for performance
+ * Contains metadata about the database file with better alignment
+ */
+typedef struct {
+    char magic[8];                 // Magic number string "FXDB01\0\0"
+    uint32_t version;              // File format version
+    uint32_t schema_size;          // Size of schema section in bytes
+    uint32_t data_size;            // Size of data section in bytes  
+    uint32_t chunk_size;           // Number of rows per chunk
+    uint64_t created_timestamp;    // File creation timestamp
+    uint64_t modified_timestamp;   // Last modification timestamp
+    uint32_t checksum;             // Header checksum for integrity
+    uint8_t reserved[36];          // Reserved for future use (total = 88 bytes)
+} __attribute__((packed)) fxdb_enhanced_header_t;
+
+/**
+ * Database creation configuration
+ * Settings for creating new databases
+ */
+typedef struct {
+    uint32_t chunk_size;           // Rows per chunk (default: 10000)
+    bool enable_compression;       // Enable compression (future)
+    bool enable_indexing;          // Enable indexing (future)
+    bool enable_checksum;          // Enable integrity checking
+    uint32_t initial_capacity;     // Initial capacity hint
+} fxdb_create_config_t;
+
+/**
+ * Database open mode flags
+ */
+typedef enum {
+    FXDB_OPEN_READ_ONLY = 0x01,    // Open for reading only
+    FXDB_OPEN_READ_WRITE = 0x02,   // Open for reading and writing
+    FXDB_OPEN_APPEND = 0x04,       // Open for appending data
+    FXDB_OPEN_CREATE = 0x08,       // Create if doesn't exist
+    FXDB_OPEN_EXCLUSIVE = 0x10     // Fail if file exists (with CREATE)
+} fxdb_open_mode_t;
 
 /**
  * Database header structure - Enhanced version

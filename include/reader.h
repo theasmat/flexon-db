@@ -3,12 +3,13 @@
 
 #include "schema.h"
 #include "writer.h"
+#include "io_utils.h"
 #include <stdint.h>
 #include <stdio.h>
 
 // Reader context
 typedef struct {
-    FILE* file;                 // File handle
+    FILE* file;                 // File handle (for traditional I/O)
     schema_t* schema;           // Schema loaded from file
     fxdb_header_t header;       // File header
     
@@ -19,6 +20,26 @@ typedef struct {
     uint8_t* chunk_buffer;      // Buffer for current chunk
     long chunk_data_start;      // Start of current chunk data
 } reader_t;
+
+/**
+ * Enhanced reader context with memory mapping support
+ */
+typedef struct {
+    fxdb_mmap_reader_t* mmap_reader;  // Memory-mapped reader (if used)
+    FILE* file;                       // Traditional file handle (fallback)
+    schema_t* schema;                 // Schema loaded from file
+    fxdb_header_t header;             // File header
+    
+    // Performance settings
+    bool use_mmap;                    // Whether to use memory mapping
+    size_t buffer_size;               // Buffer size for chunked reads
+    
+    // Current position
+    uint32_t current_chunk;           // Current chunk being read
+    uint32_t current_row;             // Current row in chunk
+    uint32_t total_rows;              // Total rows in database
+    size_t current_offset;            // Current byte offset in file
+} fxdb_enhanced_reader_t;
 
 // Row data for reading
 typedef struct {
@@ -39,6 +60,14 @@ typedef struct {
  * Returns reader_t pointer on success, NULL on failure
  */
 reader_t* reader_open(const char* filename);
+
+/**
+ * Open .fxdb file for reading with enhanced performance (ENHANCED)
+ * @param filename Database filename
+ * @param use_mmap Whether to use memory mapping for better performance
+ * @return Enhanced reader pointer on success, NULL on failure
+ */
+fxdb_enhanced_reader_t* fxdb_reader_open(const char* filename, bool use_mmap);
 
 /**
  * Read next row from file
@@ -82,6 +111,26 @@ void reader_print_rows(const reader_t* reader, const query_result_t* result);
  * Close reader
  */
 void reader_close(reader_t* reader);
+
+/**
+ * Close enhanced reader and release resources
+ */
+void fxdb_reader_close(fxdb_enhanced_reader_t* reader);
+
+/**
+ * Read next row from enhanced reader
+ * @param reader Enhanced reader instance
+ * @return row_data_t pointer on success, NULL on EOF or error
+ */
+row_data_t* fxdb_reader_read_row(fxdb_enhanced_reader_t* reader);
+
+/**
+ * Seek to specific row in enhanced reader
+ * @param reader Enhanced reader instance
+ * @param row_number Row number (0-based)
+ * @return 0 on success, -1 on error
+ */
+int fxdb_reader_seek_row(fxdb_enhanced_reader_t* reader, uint32_t row_number);
 
 /**
  * Free row data

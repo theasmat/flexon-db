@@ -1,4 +1,5 @@
 #include "../../include/writer.h"
+#include "../../include/io_utils.h"
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
@@ -340,4 +341,99 @@ writer_t* writer_open(const char* filename __attribute__((unused))) {
     // This requires reading the header and schema first
     fprintf(stderr, "writer_open: Not yet implemented\n");
     return NULL;
+}
+
+/* ============================================================================
+ * Enhanced Database Operations Implementation
+ * ============================================================================ */
+
+/**
+ * Create a new .fxdb database with enhanced configuration
+ */
+int fxdb_database_create(const char* filename, const schema_t* schema, const fxdb_create_config_t* config) {
+    if (!filename || !schema) {
+        return -1;
+    }
+
+    // Normalize filename to ensure .fxdb extension
+    char* normalized_name = fxdb_normalize_filename(filename);
+    if (!normalized_name) {
+        return -1;
+    }
+
+    // Check if file already exists
+    if (fxdb_database_exists(normalized_name)) {
+        free(normalized_name);
+        return -1; // File already exists
+    }
+
+    // Use default config if none provided
+    fxdb_create_config_t default_config = {
+        .chunk_size = DEFAULT_CHUNK_SIZE,
+        .enable_compression = false,
+        .enable_indexing = false,
+        .enable_checksum = true,
+        .initial_capacity = 0
+    };
+    
+    if (!config) {
+        config = &default_config;
+    }
+
+    // Create writer configuration
+    writer_config_t writer_config = {
+        .chunk_size = config->chunk_size,
+        .use_compression = config->enable_compression,
+        .build_index = config->enable_indexing
+    };
+
+    // Create the database using existing writer_create
+    writer_t* writer = writer_create(normalized_name, schema, &writer_config);
+    if (!writer) {
+        free(normalized_name);
+        return -1;
+    }
+
+    // Close immediately since we're just creating
+    int result = writer_close(writer);
+    writer_free(writer);
+    
+    free(normalized_name);
+    return result;
+}
+
+/**
+ * Open existing .fxdb file for appending (ENHANCED)
+ */
+writer_t* fxdb_writer_open(const char* filename, fxdb_open_mode_t mode) {
+    if (!filename) {
+        return NULL;
+    }
+
+    // Normalize filename
+    char* normalized_name = fxdb_normalize_filename(filename);
+    if (!normalized_name) {
+        return NULL;
+    }
+
+    // Check if file exists
+    bool file_exists = fxdb_database_exists(normalized_name);
+    
+    // Handle different open modes
+    if ((mode & FXDB_OPEN_CREATE) && (mode & FXDB_OPEN_EXCLUSIVE) && file_exists) {
+        free(normalized_name);
+        return NULL; // File exists but exclusive creation requested
+    }
+    
+    if (!(mode & FXDB_OPEN_CREATE) && !file_exists) {
+        free(normalized_name);
+        return NULL; // File doesn't exist and creation not requested
+    }
+
+    // For now, just call the original writer_open for append mode
+    // TODO: Implement full mode support
+    writer_t* writer = writer_open(normalized_name);
+    
+    free(normalized_name);
+    return writer;
 }
