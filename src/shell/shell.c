@@ -111,11 +111,11 @@ void print_prompt(const shell_session_t *session)
         if (ext)
             *ext = '\0';
 
-        printf("flexondb:%s> ", db_name);
+        printf(COLOR_PROMPT "flexondb:" COLOR_EMPHASIS "%s" COLOR_PROMPT "> " COLOR_RESET, db_name);
     }
     else
     {
-        printf("flexondb> ");
+        printf(COLOR_PROMPT "flexondb> " COLOR_RESET);
     }
     fflush(stdout);
 }
@@ -126,8 +126,8 @@ void print_prompt(const shell_session_t *session)
 void print_goodbye(const shell_session_t *session)
 {
     printf("\n");
-    printf("👋 Goodbye from FlexonDB!\n");
-    printf("═══════════════════════════\n\n");
+    printf(COLOR_SUCCESS "👋 Goodbye from FlexonDB!" COLOR_RESET "\n");
+    printf(COLOR_MUTED "═══════════════════════════" COLOR_RESET "\n\n");
 
     // Calculate session duration
     time_t end_time = time(NULL);
@@ -224,8 +224,8 @@ int execute_shell_command(shell_session_t *session, const parsed_command_t *cmd)
 
     case CMD_UNKNOWN:
     default:
-        printf("❌ Unknown command: %s\n", cmd->args[0] ? cmd->args[0] : "");
-        printf("💡 Type 'help' for available commands.\n");
+        printf(COLOR_ERROR "❌ Unknown command: " COLOR_RESET "%s\n", cmd->args[0] ? cmd->args[0] : "");
+        printf(COLOR_INFO "💡 Type 'help' for available commands." COLOR_RESET "\n");
         result = -1;
         break;
     }
@@ -238,7 +238,7 @@ int execute_shell_command(shell_session_t *session, const parsed_command_t *cmd)
         double elapsed = end_timing(&timing);
         if (elapsed > 10.0)
         { // Only show timing for commands that take > 10ms
-            printf("⏱️  Command completed in %.1f ms\n", elapsed);
+            printf(COLOR_MUTED "⏱️  Command completed in %.1f ms" COLOR_RESET "\n", elapsed);
         }
     }
 
@@ -595,10 +595,10 @@ static int cmd_shell_create(shell_session_t *session, const parsed_command_t *cm
 {
     if (cmd->arg_count < 2)
     {
-        printf("❌ Usage: create <database> --schema \"field1 type1, field2 type2, ...\" [-d directory]\n");
-        printf("❌    or: create <database> schema=\"field1 type1, field2 type2, ...\" [-d directory]\n");
-        printf("💡 Example: create products.fxdb --schema \"id int32, name string, price float\"\n");
-        printf("💡 Example: create products.fxdb schema=\"id int32, name string, price float\" -d ~/databases\n");
+        printf(COLOR_ERROR "❌ Usage:" COLOR_RESET " create <database> --schema \"field1 type1, field2 type2, ...\" [-d directory]\n");
+        printf(COLOR_ERROR "❌    or:" COLOR_RESET " create <database> schema=\"field1 type1, field2 type2, ...\" [-d directory]\n");
+        printf(COLOR_INFO "💡 Example:" COLOR_RESET " create products.fxdb --schema \"id int32, name string, price float\"\n");
+        printf(COLOR_INFO "💡 Example:" COLOR_RESET " create products.fxdb schema=\"id int32, name string, price float\" -d ~/databases\n");
         return -1;
     }
 
@@ -637,10 +637,10 @@ static int cmd_shell_create(shell_session_t *session, const parsed_command_t *cm
 
     if (!schema_str)
     {
-        printf("❌ Schema not specified. Use one of these formats:\n");
+        printf(COLOR_ERROR "❌ Schema not specified. Use one of these formats:" COLOR_RESET "\n");
         printf("   create <database> --schema \"field1 type1, field2 type2, ...\"\n");
         printf("   create <database> schema=\"field1 type1, field2 type2, ...\"\n");
-        printf("💡 Example: create products.fxdb --schema \"id int32, name string, price float\"\n");
+        printf(COLOR_INFO "💡 Example:" COLOR_RESET " create products.fxdb --schema \"id int32, name string, price float\"\n");
         return -1;
     }
 
@@ -679,31 +679,31 @@ static int cmd_shell_create(shell_session_t *session, const parsed_command_t *cm
         return -1;
     }
 
-    printf("🛠️  Creating database: %s\n", db_name);
+    printf(COLOR_INFO "🛠️  Creating database: " COLOR_EMPHASIS "%s" COLOR_RESET "\n", db_name);
     if (directory)
     {
-        printf("📁 Directory: %s\n", directory);
+        printf(COLOR_INFO "📁 Directory: " COLOR_RESET "%s\n", directory);
     }
-    printf("📋 Schema: %s\n\n", schema_str);
+    printf(COLOR_INFO "📋 Schema: " COLOR_RESET "%s\n\n", schema_str);
 
     schema_t *schema = parse_schema(schema_str);
     if (!schema)
     {
-        printf("❌ Failed to parse schema\n");
-        printf("💡 Check your schema format: \"field1 type1, field2 type2, ...\"\n");
-        printf("💡 Valid types: int32, float, string, bool\n");
+        printf(COLOR_ERROR "❌ Failed to parse schema" COLOR_RESET "\n");
+        printf(COLOR_INFO "💡 Check your schema format: \"field1 type1, field2 type2, ...\"" COLOR_RESET "\n");
+        printf(COLOR_INFO "💡 Valid types: int32, float, string, bool" COLOR_RESET "\n");
         free(full_path);
         return -1;
     }
 
-    printf("✅ Parsed schema:\n");
+    printf(COLOR_SUCCESS "✅ Parsed schema:" COLOR_RESET "\n");
     print_schema(schema);
     printf("\n");
 
     writer_t *writer = writer_create_default(full_path, schema);
     if (!writer)
     {
-        printf("❌ Failed to create database file\n");
+        printf(COLOR_ERROR "❌ Failed to create database file" COLOR_RESET "\n");
         free_schema(schema);
         free(full_path);
         return -1;
@@ -711,7 +711,7 @@ static int cmd_shell_create(shell_session_t *session, const parsed_command_t *cm
 
     if (writer_close(writer) != 0)
     {
-        printf("❌ Failed to finalize database file\n");
+        printf(COLOR_ERROR "❌ Failed to finalize database file" COLOR_RESET "\n");
         writer_free(writer);
         free_schema(schema);
         free(full_path);
@@ -721,7 +721,7 @@ static int cmd_shell_create(shell_session_t *session, const parsed_command_t *cm
     writer_free(writer);
     free_schema(schema);
 
-    printf("🎉 Database created successfully: %s\n", db_name);
+    printf(COLOR_SUCCESS "🎉 Database created successfully: " COLOR_EMPHASIS "%s" COLOR_RESET "\n", db_name);
 
     // Show file info
     struct stat st;
@@ -729,7 +729,7 @@ static int cmd_shell_create(shell_session_t *session, const parsed_command_t *cm
     {
         char size_str[32];
         format_file_size(st.st_size, size_str, sizeof(size_str));
-        printf("📊 File size: %s\n", size_str);
+        printf(COLOR_INFO "📊 File size: " COLOR_RESET "%s\n", size_str);
     }
 
     free(full_path);
