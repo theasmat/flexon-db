@@ -1,8 +1,8 @@
 #define _GNU_SOURCE
-#include "../include/schema.h"
-#include "../include/writer.h"
-#include "../include/reader.h"
-#include "../include/shell.h"
+#include "../../include/schema.h"
+#include "../../include/writer.h"
+#include "../../include/reader.h"
+#include "../../include/shell.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
