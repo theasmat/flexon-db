@@ -12,25 +12,37 @@
 #include <unistd.h>
 #include <errno.h>
 
+// Cross-platform directory scanning
+#ifdef _WIN32
+    #include <windows.h>
+    #define PATH_SEPARATOR '\\'
+    #define PATH_SEPARATOR_STR "\\"
+#else
+    #include <dirent.h>
+    #define PATH_SEPARATOR '/'
+    #define PATH_SEPARATOR_STR "/"
+#endif
+
 // Print usage information
 void print_usage(const char *program_name)
 {
     printf("Usage: %s <command> [options]\n\n", program_name);
     printf("Commands:\n");
-    printf("  create <file.fxdb> --schema \"field1 type1, field2 type2, ...\" [-d directory]\n");
+    printf("  create <file.fxdb> --schema \"field1 type1, field2 type2, ...\" [-d directory] [-p path]\n");
     printf("         Create a new FlexonDB file with specified schema\n\n");
-    printf("  insert <file.fxdb> --data '{\"field1\": \"value1\", \"field2\": value2}' [-d directory]\n");
+    printf("  insert <file.fxdb> --data '{\"field1\": \"value1\", \"field2\": value2}' [-d directory] [-p path]\n");
     printf("         Insert a row into existing database (JSON format)\n\n");
-    printf("  read   <file.fxdb> [--limit N] [-d directory]\n");
+    printf("  read   <file.fxdb> [--limit N] [-d directory] [-p path]\n");
     printf("         Read and display rows from database\n\n");
-    printf("  info   <file.fxdb> [-d directory]\n");
+    printf("  info   <file.fxdb> [-d directory] [-p path]\n");
     printf("         Show database information and schema\n\n");
-    printf("  dump   <file.fxdb> [-d directory]\n");
+    printf("  dump   <file.fxdb> [-d directory] [-p path]\n");
     printf("         Export all data in readable format\n\n");
-    printf("  list   [-d directory]\n");
+    printf("  list   [-d directory] [-p path]\n");
     printf("         List all .fxdb files in directory\n\n");
     printf("Options:\n");
     printf("  -d, --directory <path>  Specify directory for database files\n");
+    printf("  -p, --path <path>       Specify path for database files (same as -d)\n");
     printf("                         (default: current working directory)\n\n");
     printf("Data Types:\n");
     printf("  int32   - 32-bit signed integer\n");
@@ -40,10 +52,12 @@ void print_usage(const char *program_name)
     printf("Examples:\n");
     printf("  %s create people.fxdb --schema \"name string, age int32, salary float\"\n", program_name);
     printf("  %s create people.fxdb --schema \"name string, age int32\" -d /path/to/db\n", program_name);
+    printf("  %s create people.fxdb --schema \"name string, age int32\" -p /path/to/db\n", program_name);
     printf("  %s insert people.fxdb --data '{\"name\": \"Alice\", \"age\": 30}' -d /path/to/db\n", program_name);
     printf("  %s read people.fxdb --limit 10\n", program_name);
     printf("  %s info people.fxdb -d /home/user/databases\n", program_name);
     printf("  %s list -d /home/user/databases\n", program_name);
+    printf("  %s list -p /home/user/databases\n", program_name);
     printf("\n");
 }
 
@@ -72,6 +86,30 @@ int create_directory(const char *path)
     return -1;
 }
 
+// Cross-platform path joining function
+char* join_path(const char* dir, const char* filename) {
+    if (!filename) return NULL;
+    if (!dir || strlen(dir) == 0) return strdup(filename);
+    
+    size_t dir_len = strlen(dir);
+    size_t file_len = strlen(filename);
+    
+    // Check if directory already ends with separator
+    bool need_separator = (dir_len > 0 && dir[dir_len - 1] != PATH_SEPARATOR);
+    size_t total_len = dir_len + file_len + (need_separator ? 1 : 0) + 1; // +1 for '\0'
+    
+    char* result = malloc(total_len);
+    if (!result) return NULL;
+    
+    strcpy(result, dir);
+    if (need_separator) {
+        strcat(result, PATH_SEPARATOR_STR);
+    }
+    strcat(result, filename);
+    
+    return result;
+}
+
 // Helper function to build full file path with .fxdb extension normalization
 char *build_file_path(const char *directory, const char *filename)
 {
@@ -89,83 +127,173 @@ char *build_file_path(const char *directory, const char *filename)
         return normalized_filename; // Already allocated by fxdb_normalize_filename
     }
 
-    // Build full path
-    size_t dir_len = strlen(directory);
-    size_t file_len = strlen(normalized_filename);
-    size_t total_len = dir_len + file_len + 2; // +2 for '/' and '\0'
-
-    char *full_path = malloc(total_len);
-    if (!full_path) {
-        free(normalized_filename);
-        return NULL;
-    }
-
-    snprintf(full_path, total_len, "%s/%s", directory, normalized_filename);
+    // Build full path using cross-platform path joining
+    char *full_path = join_path(directory, normalized_filename);
     free(normalized_filename);
     return full_path;
 }
 
-// List command - show all .fxdb files in directory
+// Cross-platform directory listing function
+int list_fxdb_files(const char* directory, char*** file_list, int* file_count) {
+    *file_list = NULL;
+    *file_count = 0;
+    
+#ifdef _WIN32
+    // Windows implementation
+    char search_pattern[MAX_PATH];
+    snprintf(search_pattern, sizeof(search_pattern), "%s\\*.fxdb", directory);
+    
+    WIN32_FIND_DATA find_data;
+    HANDLE find_handle = FindFirstFile(search_pattern, &find_data);
+    
+    if (find_handle == INVALID_HANDLE_VALUE) {
+        return 0; // No files found, not an error
+    }
+    
+    // Count files first
+    int count = 0;
+    do {
+        if (!(find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+            count++;
+        }
+    } while (FindNextFile(find_handle, &find_data));
+    FindClose(find_handle);
+    
+    if (count == 0) {
+        return 0;
+    }
+    
+    // Allocate file list
+    *file_list = malloc(count * sizeof(char*));
+    if (!*file_list) {
+        return -1;
+    }
+    
+    // Collect files
+    find_handle = FindFirstFile(search_pattern, &find_data);
+    int index = 0;
+    do {
+        if (!(find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+            (*file_list)[index] = strdup(find_data.cFileName);
+            if (!(*file_list)[index]) {
+                // Cleanup on error
+                for (int i = 0; i < index; i++) {
+                    free((*file_list)[i]);
+                }
+                free(*file_list);
+                *file_list = NULL;
+                FindClose(find_handle);
+                return -1;
+            }
+            index++;
+        }
+    } while (FindNextFile(find_handle, &find_data) && index < count);
+    FindClose(find_handle);
+    
+    *file_count = count;
+    return 0;
+    
+#else
+    // Unix/Linux implementation
+    DIR* dir = opendir(directory);
+    if (!dir) {
+        return -1;
+    }
+    
+    // Count .fxdb files first
+    int count = 0;
+    struct dirent* entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (entry->d_type == DT_REG || entry->d_type == DT_UNKNOWN) {
+            size_t name_len = strlen(entry->d_name);
+            if (name_len > 5 && strcmp(entry->d_name + name_len - 5, ".fxdb") == 0) {
+                count++;
+            }
+        }
+    }
+    rewinddir(dir);
+    
+    if (count == 0) {
+        closedir(dir);
+        return 0;
+    }
+    
+    // Allocate file list
+    *file_list = malloc(count * sizeof(char*));
+    if (!*file_list) {
+        closedir(dir);
+        return -1;
+    }
+    
+    // Collect files
+    int index = 0;
+    while ((entry = readdir(dir)) != NULL && index < count) {
+        if (entry->d_type == DT_REG || entry->d_type == DT_UNKNOWN) {
+            size_t name_len = strlen(entry->d_name);
+            if (name_len > 5 && strcmp(entry->d_name + name_len - 5, ".fxdb") == 0) {
+                (*file_list)[index] = strdup(entry->d_name);
+                if (!(*file_list)[index]) {
+                    // Cleanup on error
+                    for (int i = 0; i < index; i++) {
+                        free((*file_list)[i]);
+                    }
+                    free(*file_list);
+                    *file_list = NULL;
+                    closedir(dir);
+                    return -1;
+                }
+                index++;
+            }
+        }
+    }
+    closedir(dir);
+    
+    *file_count = count;
+    return 0;
+#endif
+}
+
+// List command - show all .fxdb files in directory (cross-platform)
 int cmd_list(const char *directory)
 {
     const char *search_dir = directory ? directory : ".";
-
     printf("📂 FlexonDB files in directory: %s\n\n", search_dir);
 
-    // Simple implementation using system command
-    char command[512];
-    snprintf(command, sizeof(command), "find \"%s\" -maxdepth 1 -name \"*.fxdb\" -type f 2>/dev/null", search_dir);
-
-    FILE *fp = popen(command, "r");
-    if (!fp)
-    {
+    char** file_list = NULL;
+    int file_count = 0;
+    int result = list_fxdb_files(search_dir, &file_list, &file_count);
+    
+    if (result != 0) {
         printf("❌ Failed to list files in directory\n");
         return 1;
     }
-
-    char line[512];
-    int count = 0;
-
-    while (fgets(line, sizeof(line), fp))
-    {
-        // Remove newline
-        line[strcspn(line, "\n")] = 0;
-
-        // Extract just the filename
-        char *filename = strrchr(line, '/');
-        if (filename)
-        {
-            filename++; // Skip the '/'
-        }
-        else
-        {
-            filename = line;
-        }
-
-        printf("  📄 %s", filename);
-
-        // Try to get file size
-        struct stat st;
-        if (stat(line, &st) == 0)
-        {
-            printf(" (%lld bytes)", (long long)st.st_size);
-        }
-        printf("\n");
-        count++;
-    }
-
-    pclose(fp);
-
-    if (count == 0)
-    {
+    
+    if (file_count == 0) {
         printf("  No .fxdb files found.\n");
         printf("  💡 Use 'flexon create <filename> --schema \"...\"' to create a database.\n");
+        return 0;
     }
-    else
-    {
-        printf("\n📊 Found %d database file(s).\n", count);
+    
+    // Display files with size information
+    for (int i = 0; i < file_count; i++) {
+        printf("  📄 %s", file_list[i]);
+        
+        // Try to get file size
+        char* full_path = join_path(search_dir, file_list[i]);
+        if (full_path) {
+            struct stat st;
+            if (stat(full_path, &st) == 0) {
+                printf(" (%lld bytes)", (long long)st.st_size);
+            }
+            free(full_path);
+        }
+        printf("\n");
+        
+        free(file_list[i]);
     }
-
+    
+    free(file_list);
+    printf("\n📊 Found %d database file(s).\n", file_count);
     return 0;
 }
 
@@ -346,8 +474,9 @@ int main(int argc, char *argv[])
         return run_interactive_shell(NULL);
     }
 
-    // Check if only directory flag provided - launch interactive shell with directory
-    if (argc == 3 && (strcmp(argv[1], "-d") == 0 || strcmp(argv[1], "--directory") == 0))
+    // Check if only directory/path flag provided - launch interactive shell with directory
+    if (argc == 3 && (strcmp(argv[1], "-d") == 0 || strcmp(argv[1], "--directory") == 0 ||
+                      strcmp(argv[1], "-p") == 0 || strcmp(argv[1], "--path") == 0))
     {
         return run_interactive_shell(argv[2]);
     }
@@ -364,10 +493,11 @@ int main(int argc, char *argv[])
     const char *command = argv[1];
     const char *directory = NULL;
 
-    // Parse directory option from any position
+    // Parse directory/path option from any position
     for (int i = 2; i < argc; i++)
     {
-        if ((strcmp(argv[i], "-d") == 0 || strcmp(argv[i], "--directory") == 0) && i + 1 < argc)
+        if ((strcmp(argv[i], "-d") == 0 || strcmp(argv[i], "--directory") == 0 ||
+             strcmp(argv[i], "-p") == 0 || strcmp(argv[i], "--path") == 0) && i + 1 < argc)
         {
             directory = argv[i + 1];
             break;
@@ -378,7 +508,7 @@ int main(int argc, char *argv[])
     {
         if (argc < 5 || strcmp(argv[3], "--schema") != 0)
         {
-            printf("❌ Usage: %s create <file.fxdb> --schema \"field1 type1, field2 type2\" [-d directory]\n", argv[0]);
+            printf("❌ Usage: %s create <file.fxdb> --schema \"field1 type1, field2 type2\" [-d directory] [-p path]\n", argv[0]);
             return 1;
         }
         return cmd_create(argv[2], argv[4], directory);
@@ -387,7 +517,7 @@ int main(int argc, char *argv[])
     {
         if (argc < 3)
         {
-            printf("❌ Usage: %s info <file.fxdb> [-d directory]\n", argv[0]);
+            printf("❌ Usage: %s info <file.fxdb> [-d directory] [-p path]\n", argv[0]);
             return 1;
         }
         return cmd_info(argv[2], directory);
@@ -396,7 +526,7 @@ int main(int argc, char *argv[])
     {
         if (argc < 3)
         {
-            printf("❌ Usage: %s read <file.fxdb> [--limit N] [-d directory]\n", argv[0]);
+            printf("❌ Usage: %s read <file.fxdb> [--limit N] [-d directory] [-p path]\n", argv[0]);
             return 1;
         }
 

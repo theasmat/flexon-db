@@ -67,7 +67,7 @@ schema_t* parse_schema(const char* schema_str) {
         return NULL;
     }
     
-    schema_t* schema = malloc(sizeof(schema_t));
+    schema_t* schema = calloc(1, sizeof(schema_t));
     if (!schema) {
         fprintf(stderr, "Error: Memory allocation failed\n");
         return NULL;
