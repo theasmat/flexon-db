@@ -16,6 +16,12 @@ $(BUILDDIR):
 	mkdir -p $(BUILDDIR)
 
 # Common utilities
+$(BUILDDIR)/logo.o: $(COMMON_SRCDIR)/logo.c include/logo.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+	
+$(BUILDDIR)/welcome.o: $(COMMON_SRCDIR)/welcome.c include/welcome.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
 $(BUILDDIR)/error.o: $(COMMON_SRCDIR)/error.c include/error.h include/config.h include/types.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
@@ -50,7 +56,7 @@ $(BUILDDIR)/main.o: $(CLI_SRCDIR)/main.c include/schema.h include/writer.h inclu
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
 # Object groups
-COMMON_OBJS = $(BUILDDIR)/error.o $(BUILDDIR)/utils.o
+COMMON_OBJS = $(BUILDDIR)/error.o $(BUILDDIR)/utils.o $(BUILDDIR)/logo.o $(BUILDDIR)/welcome.o
 CORE_OBJS = $(BUILDDIR)/schema.o $(BUILDDIR)/writer.o $(BUILDDIR)/reader.o
 SHELL_OBJS = $(BUILDDIR)/session.o $(BUILDDIR)/formatter.o $(BUILDDIR)/parser.o $(BUILDDIR)/shell.o
 CLI_OBJS = $(BUILDDIR)/main.o

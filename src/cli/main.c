@@ -3,42 +3,13 @@
 #include "../../include/writer.h"
 #include "../../include/reader.h"
 #include "../../include/shell.h"
+#include "../../include/welcome.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <errno.h>
-
-// Print the FlexonDB logo
-const char *logo =
-    "                  $$$                                                      \n"
-    "               $$$$$$$$$                                                   \n"
-    "           $$$$$$$$$$$$$$$$$                                               \n"
-    "        $$$$$$$$$$$$$$$$$$$$$$$                                            \n"
-    "     $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$                                        \n"
-    " $$$$$$$$$$      $$$$$$$$$$$$$$$$$$$$$             $$$$$   $$$$$           \n"
-    "$$$$$$$$$        $$$$$$$$$$$$$$$$$$$$$$            $$$$$   $$$$$           \n"
-    "$$$$$$$$$    $$$$$$$$$$$$$$$$$$$$$$$$$$            $$$$$   $$$$$           \n"
-    "$$$$$$$$$    $$$$$$$$$$$$$$$$$$$$$$$$$$       $$$  $$$$$   $$$$$   $$      \n"
-    "$$$$$$          $$     $$$$     $$$$$$$    $$$$$$$$$$$$$   $$$$$$$$$$$$$$  \n"
-    "$$$$$$$$$    $$$$$$$    $$     $$$$$$$$   $$$$$   $$$$$$   $$$$$$   $$$$$$ \n"
-    "$$$$$$$$$    $$$$$$$$         $$$$$$$$$  $$$$$     $$$$$   $$$$$      $$$$ \n"
-    "$$$$$$$$$    $$$$$$$$$       $$$$$$$$$$  $$$$      $$$$$   $$$$$      $$$$$\n"
-    "$$$$$$$$$    $$$$$$$$$       $$$$$$$$$$  $$$$      $$$$$   $$$$$      $$$$$\n"
-    "$$$$$$$$$    $$$$$$$          $$$$$$$$$  $$$$$     $$$$$   $$$$$      $$$$ \n"
-    "$$$$$$$$$    $$$$$$     $$     $$$$$$$$   $$$$$$$$$$$$$$   $$$$$$$$$$$$$$$ \n"
-    " $$$$$$$$    $$$$$     $$$$     $$$$$$      $$$$$$$ $$$$   $$$$$$$$$$$$$   \n"
-    "   $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$                                        \n"
-    "       $$$$$$$$$$$$$$$$$$$$$$$$$$                                           \n"
-    "          $$$$$$$$$$$$$$$$$$$                                               \n"
-    "             $$$$$$$$$$$$$                                                  \n"
-    "                 $$$$$                                                      \n";
-
-void print_logo()
-{
-    printf("%s\n", logo);
-}
 
 // Print usage information
 void print_usage(const char *program_name)
@@ -351,18 +322,20 @@ int cmd_read(const char *filename, uint32_t limit, const char *directory)
 int main(int argc, char *argv[])
 {
     // Check if no arguments provided - launch interactive shell
-    if (argc == 1) {
+    if (argc == 1)
+    {
         return run_interactive_shell(NULL);
     }
-    
+
     // Check if only directory flag provided - launch interactive shell with directory
-    if (argc == 3 && (strcmp(argv[1], "-d") == 0 || strcmp(argv[1], "--directory") == 0)) {
+    if (argc == 3 && (strcmp(argv[1], "-d") == 0 || strcmp(argv[1], "--directory") == 0))
+    {
         return run_interactive_shell(argv[2]);
     }
-    
-    // Original CLI mode - print logo and handle commands
-    print_logo();
 
+    // Original CLI mode - print logo and handle commands
+    print_welcome_message();
+    printf("\n");
     if (argc < 2)
     {
         print_usage(argv[0]);
