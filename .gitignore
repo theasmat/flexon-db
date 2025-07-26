@@ -1,0 +1,21 @@
+# Build artifacts
+build/
+*.o
+*.dSYM/
+
+# Database files (for testing)
+*.fxdb
+
+# Temporary directories
+demo_databases/
+test_databases/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
