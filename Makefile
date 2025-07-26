@@ -28,6 +28,9 @@ $(BUILDDIR)/error.o: $(COMMON_SRCDIR)/error.c include/error.h include/config.h i
 $(BUILDDIR)/utils.o: $(COMMON_SRCDIR)/utils.c include/utils.h include/error.h include/types.h include/config.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
+$(BUILDDIR)/io_utils.o: $(COMMON_SRCDIR)/io_utils.c include/io_utils.h include/config.h include/types.h include/error.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
 # Core database modules
 $(BUILDDIR)/schema.o: $(CORE_SRCDIR)/schema.c include/schema.h include/config.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
@@ -56,7 +59,7 @@ $(BUILDDIR)/main.o: $(CLI_SRCDIR)/main.c include/schema.h include/writer.h inclu
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
 # Object groups
-COMMON_OBJS = $(BUILDDIR)/error.o $(BUILDDIR)/utils.o $(BUILDDIR)/logo.o $(BUILDDIR)/welcome.o
+COMMON_OBJS = $(BUILDDIR)/error.o $(BUILDDIR)/utils.o $(BUILDDIR)/io_utils.o $(BUILDDIR)/logo.o $(BUILDDIR)/welcome.o
 CORE_OBJS = $(BUILDDIR)/schema.o $(BUILDDIR)/writer.o $(BUILDDIR)/reader.o
 SHELL_OBJS = $(BUILDDIR)/session.o $(BUILDDIR)/formatter.o $(BUILDDIR)/parser.o $(BUILDDIR)/shell.o
 CLI_OBJS = $(BUILDDIR)/main.o
@@ -69,10 +72,10 @@ $(BUILDDIR)/flexon: $(CLI_OBJS) $(CORE_OBJS) $(SHELL_OBJS) $(COMMON_OBJS) | $(BU
 $(BUILDDIR)/test_schema: $(EXAMPLEDIR)/test_schema.c $(BUILDDIR)/schema.o | $(BUILDDIR)
 	$(CC) $(CFLAGS) $(INCLUDES) $^ -o $@
 
-$(BUILDDIR)/test_writer: $(EXAMPLEDIR)/test_writer.c $(CORE_OBJS) | $(BUILDDIR)
+$(BUILDDIR)/test_writer: $(EXAMPLEDIR)/test_writer.c $(CORE_OBJS) $(COMMON_OBJS) | $(BUILDDIR)
 	$(CC) $(CFLAGS) $(INCLUDES) $^ -o $@
 
-$(BUILDDIR)/test_reader: $(EXAMPLEDIR)/test_reader.c $(CORE_OBJS) | $(BUILDDIR)
+$(BUILDDIR)/test_reader: $(EXAMPLEDIR)/test_reader.c $(CORE_OBJS) $(COMMON_OBJS) | $(BUILDDIR)
 	$(CC) $(CFLAGS) $(INCLUDES) $^ -o $@
 
 # Configuration demo

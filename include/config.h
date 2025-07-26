@@ -30,9 +30,18 @@
 #define MAX_PATH_LENGTH 4096
 
 /* ============================================================================
+ * Performance and I/O Configuration
+ * ============================================================================ */
+#define FXDB_BUFFER_SIZE 4096      // Standard I/O buffer size (4KB)
+#define FXDB_LARGE_BUFFER_SIZE 16384  // Large I/O buffer size (16KB)
+#define FXDB_MIN_MMAP_SIZE 1024    // Minimum file size for memory mapping
+
+/* ============================================================================
  * Common Strings and Magic Numbers
  * ============================================================================ */
 #define DB_MAGIC "FXDB01"
+#define DB_MAGIC_NUM 0x42445846        // "FXDB" as 32-bit integer
+#define DB_VERSION 1                   // Current file format version
 #define VERSION_STRING "1.0.0"
 #define SHELL_PROMPT "flexondb> "
 #define SHELL_PROMPT_WITH_DB "flexondb:%s> "

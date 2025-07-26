@@ -2,6 +2,7 @@
 #define WRITER_H
 
 #include "schema.h"
+#include "types.h"
 #include <stdint.h>
 #include <stdio.h>
 
@@ -70,6 +71,29 @@ typedef struct {
 // Function declarations
 
 /**
+ * Create a new .fxdb database with enhanced configuration
+ * @param filename Database filename (will be normalized to .fxdb)
+ * @param schema Database schema definition
+ * @param config Creation configuration (NULL for defaults)
+ * @return 0 on success, -1 on failure
+ */
+int fxdb_database_create(const char* filename, const schema_t* schema, const fxdb_create_config_t* config);
+
+/**
+ * Check if database exists and is valid
+ * @param filename Database filename
+ * @return true if database exists and is readable, false otherwise
+ */
+bool fxdb_database_exists(const char* filename);
+
+/**
+ * Safely delete database file
+ * @param filename Database filename
+ * @return 0 on success, -1 on failure
+ */
+int fxdb_database_delete(const char* filename);
+
+/**
  * Create a new .fxdb file with schema
  * Returns writer_t pointer on success, NULL on failure
  */
@@ -79,6 +103,14 @@ writer_t* writer_create(const char* filename, const schema_t* schema, const writ
  * Create writer with default configuration
  */
 writer_t* writer_create_default(const char* filename, const schema_t* schema);
+
+/**
+ * Open existing .fxdb file for appending (ENHANCED)
+ * @param filename Database filename
+ * @param mode Open mode flags (FXDB_OPEN_*)
+ * @return writer_t pointer on success, NULL on failure
+ */
+writer_t* fxdb_writer_open(const char* filename, fxdb_open_mode_t mode);
 
 /**
  * Open existing .fxdb file for appending

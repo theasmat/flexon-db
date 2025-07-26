@@ -1,4 +1,5 @@
 #include "../../include/reader.h"
+#include "../../include/io_utils.h"
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
@@ -461,4 +462,364 @@ int reader_seek_row(reader_t* reader __attribute__((unused)), uint32_t row_numbe
     // TODO: Implement efficient seeking
     fprintf(stderr, "reader_seek_row: Not yet implemented\n");
     return -1;
+}
+
+/* ============================================================================
+ * Enhanced Reader Implementation with Memory Mapping
+ * ============================================================================ */
+
+/**
+ * Load schema from memory-mapped file
+ */
+static schema_t* load_schema_from_mmap(fxdb_mmap_reader_t* mmap_reader, const fxdb_header_t* header) {
+    size_t offset = header->schema_offset;
+    
+    // Read schema metadata
+    uint32_t field_count = fxdb_read_uint32_mmap(mmap_reader, offset);
+    offset += sizeof(uint32_t);
+    
+    uint32_t row_size = fxdb_read_uint32_mmap(mmap_reader, offset);
+    offset += sizeof(uint32_t);
+    
+    uint32_t schema_str_len = fxdb_read_uint32_mmap(mmap_reader, offset);
+    offset += sizeof(uint32_t);
+    
+    // Read schema string
+    char* schema_str = malloc(schema_str_len + 1);
+    if (!schema_str) return NULL;
+    
+    if (fxdb_read_string_mmap(mmap_reader, offset - sizeof(uint32_t), schema_str, schema_str_len + 1) < 0) {
+        free(schema_str);
+        return NULL;
+    }
+    offset += schema_str_len;
+    
+    // Create schema structure
+    schema_t* schema = malloc(sizeof(schema_t));
+    if (!schema) {
+        free(schema_str);
+        return NULL;
+    }
+    
+    schema->field_count = field_count;
+    schema->row_size = row_size;
+    schema->raw_schema_str = schema_str;
+    
+    // Read field definitions
+    for (uint32_t i = 0; i < field_count; i++) {
+        field_def_t* field = &schema->fields[i];
+        
+        void* field_data = fxdb_mmap_get_ptr(mmap_reader, offset);
+        if (!field_data) {
+            free_schema(schema);
+            return NULL;
+        }
+        
+        // Copy field name
+        memcpy(field->name, field_data, MAX_FIELD_NAME_LEN);
+        offset += MAX_FIELD_NAME_LEN;
+        
+        // Copy field type
+        field_data = fxdb_mmap_get_ptr(mmap_reader, offset);
+        if (!field_data) {
+            free_schema(schema);
+            return NULL;
+        }
+        field->type = *(field_type_t*)field_data;
+        offset += sizeof(field_type_t);
+        
+        // Copy field size
+        field_data = fxdb_mmap_get_ptr(mmap_reader, offset);
+        if (!field_data) {
+            free_schema(schema);
+            return NULL;
+        }
+        field->size = *(uint32_t*)field_data;
+        offset += sizeof(uint32_t);
+    }
+    
+    return schema;
+}
+
+/**
+ * Open .fxdb file for reading with enhanced performance
+ */
+fxdb_enhanced_reader_t* fxdb_reader_open(const char* filename, bool use_mmap) {
+    if (!filename) {
+        return NULL;
+    }
+    
+    // Normalize filename
+    char* normalized_name = fxdb_normalize_filename(filename);
+    if (!normalized_name) {
+        return NULL;
+    }
+    
+    fxdb_enhanced_reader_t* reader = calloc(1, sizeof(fxdb_enhanced_reader_t));
+    if (!reader) {
+        free(normalized_name);
+        return NULL;
+    }
+    
+    reader->use_mmap = use_mmap;
+    reader->buffer_size = FXDB_BUFFER_SIZE;
+    
+    if (use_mmap) {
+        // Try to open with memory mapping
+        reader->mmap_reader = fxdb_mmap_reader_open(normalized_name);
+        if (!reader->mmap_reader) {
+            // Fallback to traditional file I/O
+            reader->use_mmap = false;
+        }
+    }
+    
+    if (!reader->use_mmap) {
+        // Open with traditional file I/O
+        reader->file = fopen(normalized_name, "rb");
+        if (!reader->file) {
+            free(normalized_name);
+            free(reader);
+            return NULL;
+        }
+    }
+    
+    // Read header
+    if (reader->use_mmap) {
+        // Read header from memory-mapped file
+        void* header_ptr = fxdb_mmap_get_ptr(reader->mmap_reader, 0);
+        if (!header_ptr) {
+            fxdb_mmap_reader_close(reader->mmap_reader);
+            free(normalized_name);
+            free(reader);
+            return NULL;
+        }
+        memcpy(&reader->header, header_ptr, sizeof(fxdb_header_t));
+    } else {
+        // Read header from traditional file
+        if (fread(&reader->header, sizeof(fxdb_header_t), 1, reader->file) != 1) {
+            fclose(reader->file);
+            free(normalized_name);
+            free(reader);
+            return NULL;
+        }
+    }
+    
+    // Validate magic number
+    if (reader->header.magic != FXDB_MAGIC_NUM) {
+        fxdb_reader_close(reader);
+        free(normalized_name);
+        return NULL;
+    }
+    
+    // Load schema
+    if (reader->use_mmap) {
+        reader->schema = load_schema_from_mmap(reader->mmap_reader, &reader->header);
+    } else {
+        reader->schema = load_schema_from_file(reader->file, &reader->header);
+    }
+    
+    if (!reader->schema) {
+        fxdb_reader_close(reader);
+        free(normalized_name);
+        return NULL;
+    }
+    
+    reader->total_rows = reader->header.total_rows;
+    reader->current_offset = reader->header.data_offset;
+    
+    free(normalized_name);
+    return reader;
+}
+
+/**
+ * Close enhanced reader and release resources
+ */
+void fxdb_reader_close(fxdb_enhanced_reader_t* reader) {
+    if (!reader) {
+        return;
+    }
+    
+    if (reader->use_mmap && reader->mmap_reader) {
+        fxdb_mmap_reader_close(reader->mmap_reader);
+    }
+    
+    if (reader->file) {
+        fclose(reader->file);
+    }
+    
+    if (reader->schema) {
+        free_schema(reader->schema);
+    }
+    
+    free(reader);
+}
+
+/**
+ * Read next row from enhanced reader using memory mapping or traditional I/O
+ */
+row_data_t* fxdb_reader_read_row(fxdb_enhanced_reader_t* reader) {
+    if (!reader || !reader->schema) {
+        return NULL;
+    }
+    
+    if (reader->current_row >= reader->total_rows) {
+        return NULL; // EOF
+    }
+    
+    row_data_t* row = malloc(sizeof(row_data_t));
+    if (!row) {
+        return NULL;
+    }
+    
+    row->field_count = reader->schema->field_count;
+    row->values = malloc(sizeof(field_value_t) * row->field_count);
+    if (!row->values) {
+        free(row);
+        return NULL;
+    }
+    
+    // Read row data based on I/O method
+    if (reader->use_mmap) {
+        // Memory-mapped reading
+        size_t row_offset = reader->current_offset;
+        
+        for (uint32_t i = 0; i < row->field_count; i++) {
+            field_def_t* field = &reader->schema->fields[i];
+            row->values[i].field_name = field->name;
+            
+            void* field_data = fxdb_mmap_get_ptr(reader->mmap_reader, row_offset);
+            if (!field_data) {
+                reader_free_row(row);
+                return NULL;
+            }
+            
+            switch (field->type) {
+                case TYPE_INT32:
+                    row->values[i].value.int32_val = *(int32_t*)field_data;
+                    row_offset += sizeof(int32_t);
+                    break;
+                    
+                case TYPE_FLOAT:
+                    row->values[i].value.float_val = *(float*)field_data;
+                    row_offset += sizeof(float);
+                    break;
+                    
+                case TYPE_BOOL:
+                    row->values[i].value.bool_val = *(bool*)field_data;
+                    row_offset += sizeof(bool);
+                    break;
+                    
+                case TYPE_STRING: {
+                    char* str_val = malloc(field->size + 1);
+                    if (!str_val) {
+                        reader_free_row(row);
+                        return NULL;
+                    }
+                    
+                    // Read fixed-size string from memory-mapped file
+                    field_data = fxdb_mmap_get_ptr(reader->mmap_reader, row_offset);
+                    if (!field_data) {
+                        free(str_val);
+                        reader_free_row(row);
+                        return NULL;
+                    }
+                    
+                    memcpy(str_val, field_data, field->size);
+                    str_val[field->size] = '\0';
+                    row->values[i].value.string_val = str_val;
+                    row_offset += field->size;
+                    break;
+                }
+                    
+                default:
+                    reader_free_row(row);
+                    return NULL;
+            }
+        }
+        
+        reader->current_offset = row_offset;
+    } else {
+        // Traditional file I/O
+        if (fseek(reader->file, reader->current_offset, SEEK_SET) != 0) {
+            reader_free_row(row);
+            return NULL;
+        }
+        
+        for (uint32_t i = 0; i < row->field_count; i++) {
+            field_def_t* field = &reader->schema->fields[i];
+            row->values[i].field_name = field->name;
+            
+            switch (field->type) {
+                case TYPE_INT32:
+                    if (fread(&row->values[i].value.int32_val, sizeof(int32_t), 1, reader->file) != 1) {
+                        reader_free_row(row);
+                        return NULL;
+                    }
+                    break;
+                    
+                case TYPE_FLOAT:
+                    if (fread(&row->values[i].value.float_val, sizeof(float), 1, reader->file) != 1) {
+                        reader_free_row(row);
+                        return NULL;
+                    }
+                    break;
+                    
+                case TYPE_BOOL:
+                    if (fread(&row->values[i].value.bool_val, sizeof(bool), 1, reader->file) != 1) {
+                        reader_free_row(row);
+                        return NULL;
+                    }
+                    break;
+                    
+                case TYPE_STRING: {
+                    char* str_val = malloc(field->size + 1);
+                    if (!str_val) {
+                        reader_free_row(row);
+                        return NULL;
+                    }
+                    
+                    if (fread(str_val, 1, field->size, reader->file) != field->size) {
+                        free(str_val);
+                        reader_free_row(row);
+                        return NULL;
+                    }
+                    str_val[field->size] = '\0';
+                    row->values[i].value.string_val = str_val;
+                    break;
+                }
+                    
+                default:
+                    reader_free_row(row);
+                    return NULL;
+            }
+        }
+        
+        reader->current_offset = ftell(reader->file);
+    }
+    
+    reader->current_row++;
+    return row;
+}
+
+/**
+ * Seek to specific row in enhanced reader
+ */
+int fxdb_reader_seek_row(fxdb_enhanced_reader_t* reader, uint32_t row_number) {
+    if (!reader || !reader->schema) {
+        return -1;
+    }
+    
+    if (row_number >= reader->total_rows) {
+        return -1; // Out of bounds
+    }
+    
+    // Calculate offset for the target row
+    // This is a simplified implementation - assumes fixed row sizes
+    size_t row_size = reader->schema->row_size;
+    size_t target_offset = reader->header.data_offset + (row_number * row_size);
+    
+    reader->current_offset = target_offset;
+    reader->current_row = row_number;
+    
+    return 0;
 }
