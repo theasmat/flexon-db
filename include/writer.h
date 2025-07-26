@@ -5,14 +5,15 @@
 #include <stdint.h>
 #include <stdio.h>
 
-// FlexonDB file magic number "FXDB"
-#define FXDB_MAGIC 0x42445846
+// FlexonDB file magic number "FXDB" (numeric version)
+#ifndef FXDB_MAGIC_NUM
+#define FXDB_MAGIC_NUM 0x42445846
+#endif
 
-// Current file format version
-#define FXDB_VERSION 1
-
-// Default chunk size (rows per chunk)
+// Use centralized chunk size configuration
+#ifndef DEFAULT_CHUNK_SIZE
 #define DEFAULT_CHUNK_SIZE 10000
+#endif
 
 // Writer configuration
 typedef struct {

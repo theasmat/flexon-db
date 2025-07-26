@@ -83,7 +83,7 @@ reader_t* reader_open(const char* filename) {
     }
     
     // Validate magic number
-    if (reader->header.magic != FXDB_MAGIC) {
+    if (reader->header.magic != FXDB_MAGIC_NUM) {
         fprintf(stderr, "Error: Invalid file format (magic number mismatch)\n");
         fclose(reader->file);
         free(reader);

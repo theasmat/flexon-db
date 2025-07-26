@@ -93,7 +93,7 @@ writer_t* writer_create(const char* filename, const schema_t* schema, const writ
     }
     
     // Initialize header
-    writer->header.magic = FXDB_MAGIC;
+    writer->header.magic = FXDB_MAGIC_NUM;
     writer->header.version = FXDB_VERSION;
     writer->header.chunk_size = writer->config.chunk_size;
     writer->header.total_rows = 0;

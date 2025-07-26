@@ -1,25 +1,22 @@
 #ifndef SCHEMA_H
 #define SCHEMA_H
 
+#include "config.h"
 #include <stdint.h>
 #include <stdbool.h>
 
-// Maximum field name length
-#define MAX_FIELD_NAME_LEN 64
-#define MAX_SCHEMA_FIELDS 256
-
-// Data types supported by FlexonDB
-typedef enum {
-    FIELD_TYPE_INT32,
-    FIELD_TYPE_FLOAT,
-    FIELD_TYPE_STRING,
-    FIELD_TYPE_BOOL,
-    FIELD_TYPE_UNKNOWN
-} field_type_t;
+// Legacy compatibility - remove these after full migration
+#define MAX_FIELD_NAME_LEN MAX_FIELD_NAME_LENGTH
+#define MAX_SCHEMA_FIELDS MAX_COLUMNS
+#define FIELD_TYPE_INT32 TYPE_INT32
+#define FIELD_TYPE_FLOAT TYPE_FLOAT
+#define FIELD_TYPE_STRING TYPE_STRING
+#define FIELD_TYPE_BOOL TYPE_BOOL
+#define FIELD_TYPE_UNKNOWN TYPE_UNKNOWN
 
 // Field definition structure
 typedef struct {
-    char name[MAX_FIELD_NAME_LEN];
+    char name[MAX_FIELD_NAME_LENGTH];
     field_type_t type;
     uint32_t size;  // Size in bytes (for strings: max length, others: fixed size)
 } field_def_t;
@@ -28,11 +25,10 @@ typedef struct {
 typedef struct {
     uint32_t field_count;
     uint32_t row_size;      // Total size of one row in bytes
-    field_def_t fields[MAX_SCHEMA_FIELDS];
+    field_def_t fields[MAX_COLUMNS];
     char* raw_schema_str;   // Original schema string for reference
 } schema_t;
-
-// Function declarations
+// Function declarations (keeping existing signatures for compatibility)
 
 /**
  * Parse a schema string like "name string, age int32, salary float"
