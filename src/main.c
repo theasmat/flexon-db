@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include "../include/schema.h"
 #include "../include/writer.h"
 #include "../include/reader.h"
