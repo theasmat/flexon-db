@@ -1,5 +1,7 @@
 #define _GNU_SOURCE
 #include "../../include/schema.h"
+#include "../../include/utils.h"
+#include "../../include/error.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

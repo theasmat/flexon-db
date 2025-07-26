@@ -69,8 +69,12 @@ $(BUILDDIR)/test_writer: $(EXAMPLEDIR)/test_writer.c $(CORE_OBJS) | $(BUILDDIR)
 $(BUILDDIR)/test_reader: $(EXAMPLEDIR)/test_reader.c $(CORE_OBJS) | $(BUILDDIR)
 	$(CC) $(CFLAGS) $(INCLUDES) $^ -o $@
 
+# Configuration demo
+$(BUILDDIR)/test_config: test_config.c $(COMMON_OBJS) | $(BUILDDIR)
+	$(CC) $(CFLAGS) $(INCLUDES) $^ -o $@
+
 # Build all
-all: $(BUILDDIR)/flexon $(BUILDDIR)/test_schema $(BUILDDIR)/test_writer $(BUILDDIR)/test_reader
+all: $(BUILDDIR)/flexon $(BUILDDIR)/test_schema $(BUILDDIR)/test_writer $(BUILDDIR)/test_reader $(BUILDDIR)/test_config
 
 # Individual module builds
 core: $(CORE_OBJS)
@@ -87,6 +91,9 @@ test-writer: $(BUILDDIR)/test_writer
 
 test-reader: $(BUILDDIR)/test_reader
 	./$(BUILDDIR)/test_reader
+
+test-config: $(BUILDDIR)/test_config
+	./$(BUILDDIR)/test_config
 
 # Test all modules
 test: test-schema test-writer test-reader
@@ -146,9 +153,10 @@ help:
 	@echo "  test-schema   - Run schema tests"
 	@echo "  test-writer   - Run writer tests"
 	@echo "  test-reader   - Run reader tests"
+	@echo "  test-config   - Run configuration demo"
 	@echo "  demo-advanced - Run advanced demo"
 	@echo "  clean         - Clean all build artifacts"
 	@echo "  install       - Install to /usr/local/bin"
 	@echo "  help          - Show this help"
 
-.PHONY: all core shell common cli test test-schema test-writer test-reader demo-advanced install clean clean-core clean-shell clean-common help
+.PHONY: all core shell common cli test test-schema test-writer test-reader test-config demo-advanced install clean clean-core clean-shell clean-common help
