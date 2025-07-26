@@ -1,4 +1,7 @@
 #define _GNU_SOURCE
+// Enable BSD extensions on macOS and other BSD systems
+#define _DEFAULT_SOURCE
+#define _BSD_SOURCE
 #include "../../include/shell.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,6 +12,14 @@
 #include <dirent.h>
 #include <errno.h>
 #include <time.h>
+
+// Fallback definitions for BSD dirent constants if not available
+#ifndef DT_UNKNOWN
+    #define DT_UNKNOWN 0
+#endif
+#ifndef DT_REG
+    #define DT_REG 8
+#endif
 
 /**
  * Get current user name

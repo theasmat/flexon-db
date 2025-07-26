@@ -1,4 +1,9 @@
 #define _GNU_SOURCE
+// Enable BSD extensions on macOS and other BSD systems
+#ifndef _WIN32
+    #define _DEFAULT_SOURCE
+    #define _BSD_SOURCE
+#endif
 #include "../../include/schema.h"
 #include "../../include/writer.h"
 #include "../../include/reader.h"
@@ -21,6 +26,14 @@
     #include <dirent.h>
     #define PATH_SEPARATOR '/'
     #define PATH_SEPARATOR_STR "/"
+    
+    // Fallback definitions for BSD dirent constants if not available
+    #ifndef DT_UNKNOWN
+        #define DT_UNKNOWN 0
+    #endif
+    #ifndef DT_REG
+        #define DT_REG 8
+    #endif
 #endif
 
 // Print usage information
