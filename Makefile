@@ -19,14 +19,29 @@ $(BUILDDIR)/writer.o: $(SRCDIR)/writer.c include/writer.h include/schema.h | $(B
 $(BUILDDIR)/reader.o: $(SRCDIR)/reader.c include/reader.h include/schema.h include/writer.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
-$(BUILDDIR)/main.o: $(SRCDIR)/main.c include/schema.h include/writer.h include/reader.h | $(BUILDDIR)
+$(BUILDDIR)/session.o: $(SRCDIR)/session.c include/shell.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+$(BUILDDIR)/formatter.o: $(SRCDIR)/formatter.c include/shell.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+$(BUILDDIR)/parser.o: $(SRCDIR)/parser.c include/shell.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+$(BUILDDIR)/shell.o: $(SRCDIR)/shell.c include/shell.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+$(BUILDDIR)/main.o: $(SRCDIR)/main.c include/schema.h include/writer.h include/reader.h include/shell.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
 # Core library
 CORE_OBJS = $(BUILDDIR)/schema.o $(BUILDDIR)/writer.o $(BUILDDIR)/reader.o
 
+# Shell library
+SHELL_OBJS = $(BUILDDIR)/session.o $(BUILDDIR)/formatter.o $(BUILDDIR)/parser.o $(BUILDDIR)/shell.o
+
 # Main CLI tool
-$(BUILDDIR)/flexon: $(BUILDDIR)/main.o $(CORE_OBJS) | $(BUILDDIR)
+$(BUILDDIR)/flexon: $(BUILDDIR)/main.o $(CORE_OBJS) $(SHELL_OBJS) | $(BUILDDIR)
 	$(CC) $(CFLAGS) $^ -o $@
 
 # Test programs

@@ -2,6 +2,7 @@
 #include "../include/schema.h"
 #include "../include/writer.h"
 #include "../include/reader.h"
+#include "../include/shell.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -349,6 +350,17 @@ int cmd_read(const char *filename, uint32_t limit, const char *directory)
 // Parse command line arguments with directory support
 int main(int argc, char *argv[])
 {
+    // Check if no arguments provided - launch interactive shell
+    if (argc == 1) {
+        return run_interactive_shell(NULL);
+    }
+    
+    // Check if only directory flag provided - launch interactive shell with directory
+    if (argc == 3 && (strcmp(argv[1], "-d") == 0 || strcmp(argv[1], "--directory") == 0)) {
+        return run_interactive_shell(argv[2]);
+    }
+    
+    // Original CLI mode - print logo and handle commands
     print_logo();
 
     if (argc < 2)
