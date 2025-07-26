@@ -29,7 +29,7 @@ static schema_t* load_schema_from_file(FILE* file, const fxdb_header_t* header) 
     schema_str[schema_str_len] = '\0';
     
     // Create schema structure
-    schema_t* schema = malloc(sizeof(schema_t));
+    schema_t* schema = calloc(1, sizeof(schema_t));
     if (!schema) {
         free(schema_str);
         return NULL;
@@ -174,11 +174,11 @@ row_data_t* deserialize_row(const schema_t* schema, const uint8_t* buffer) {
         return NULL;
     }
     
-    row_data_t* row = malloc(sizeof(row_data_t));
+    row_data_t* row = calloc(1, sizeof(row_data_t));
     if (!row) return NULL;
     
     row->field_count = schema->field_count;
-    row->values = malloc(sizeof(field_value_t) * schema->field_count);
+    row->values = calloc(schema->field_count, sizeof(field_value_t));
     if (!row->values) {
         free(row);
         return NULL;
@@ -191,6 +191,8 @@ row_data_t* deserialize_row(const schema_t* schema, const uint8_t* buffer) {
         field_value_t* value = &row->values[i];
         
         value->field_name = field->name; // Point to schema field name
+        // Initialize string_val to NULL for all fields initially
+        value->value.string_val = NULL;
         
         switch (field->type) {
             case FIELD_TYPE_INT32:
@@ -273,6 +275,7 @@ query_result_t* reader_read_rows(reader_t* reader, uint32_t limit) {
     if (!result) return NULL;
     
     result->row_count = 0;
+    result->schema = reader->schema; // Store schema reference
     result->rows = malloc(sizeof(row_data_t) * limit);
     if (!result->rows) {
         free(result);
@@ -283,9 +286,16 @@ query_result_t* reader_read_rows(reader_t* reader, uint32_t limit) {
         row_data_t* row = reader_read_row(reader);
         if (!row) break;
         
+        // Move the row data (transfer ownership)
         result->rows[result->row_count] = *row;
         result->row_count++;
-        free(row); // Free the container, but keep the data
+        
+        // Free only the row container, not the values (ownership transferred)
+        if (row->values) {
+            // Don't free row->values since we transferred ownership
+            row->values = NULL;
+        }
+        free(row);
     }
     
     return result;
@@ -423,13 +433,9 @@ void reader_close(reader_t* reader) {
 void reader_free_row(row_data_t* row) {
     if (row) {
         if (row->values) {
-            // Free string values
-            for (uint32_t i = 0; i < row->field_count; i++) {
-                if (row->values[i].value.string_val) {
-                    // Only free if it's not pointing to schema field name
-                    free((char*)row->values[i].value.string_val);
-                }
-            }
+            // Note: This function should not be used for rows from query_result_t
+            // Use reader_free_result instead which has schema information
+            // For standalone rows, we can't determine field types safely
             free(row->values);
         }
         free(row);
@@ -439,15 +445,17 @@ void reader_free_row(row_data_t* row) {
 // Free query result
 void reader_free_result(query_result_t* result) {
     if (result) {
-        if (result->rows) {
+        if (result->rows && result->schema) {
             for (uint32_t i = 0; i < result->row_count; i++) {
-                // Free string values in each row
-                for (uint32_t j = 0; j < result->rows[i].field_count; j++) {
-                    if (result->rows[i].values[j].value.string_val) {
-                        free((char*)result->rows[i].values[j].value.string_val);
-                    }
-                }
+                // Free string values in each row using schema information
                 if (result->rows[i].values) {
+                    for (uint32_t j = 0; j < result->rows[i].field_count && j < result->schema->field_count; j++) {
+                        // Only free string values for string fields
+                        if (result->schema->fields[j].type == FIELD_TYPE_STRING && 
+                            result->rows[i].values[j].value.string_val) {
+                            free((char*)result->rows[i].values[j].value.string_val);
+                        }
+                    }
                     free(result->rows[i].values);
                 }
             }

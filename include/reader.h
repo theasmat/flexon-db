@@ -51,6 +51,7 @@ typedef struct {
 typedef struct {
     uint32_t row_count;
     row_data_t* rows;
+    const schema_t* schema; // Reference to schema for proper cleanup
 } query_result_t;
 
 // Function declarations
