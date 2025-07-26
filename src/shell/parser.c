@@ -41,11 +41,11 @@ shell_command_t get_command_type(const char* cmd_str) {
     if (strcmp(cmd_str, "info") == 0) return CMD_INFO;
     if (strcmp(cmd_str, "schema") == 0) return CMD_SCHEMA;
     if (strcmp(cmd_str, "status") == 0) return CMD_STATUS;
-    if (strcmp(cmd_str, "help") == 0) return CMD_HELP;
-    if (strcmp(cmd_str, "clear") == 0) return CMD_CLEAR;
+    if (strcmp(cmd_str, "help") == 0 || strcmp(cmd_str, "?") == 0) return CMD_HELP;
+    if (strcmp(cmd_str, "clear") == 0 || strcmp(cmd_str, "cls") == 0) return CMD_CLEAR;
     if (strcmp(cmd_str, "history") == 0) return CMD_HISTORY;
     if (strcmp(cmd_str, "exit") == 0) return CMD_EXIT;
-    if (strcmp(cmd_str, "quit") == 0) return CMD_QUIT;
+    if (strcmp(cmd_str, "quit") == 0 || strcmp(cmd_str, "q") == 0) return CMD_QUIT;
     
     return CMD_UNKNOWN;
 }

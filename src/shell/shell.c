@@ -595,37 +595,56 @@ static int cmd_shell_create(shell_session_t *session, const parsed_command_t *cm
 {
     if (cmd->arg_count < 2)
     {
-        printf("❌ Usage: create <database> schema=\"field1 type1, field2 type2, ...\"\n");
-        printf("💡 Example: create products.fxdb schema=\"id int32, name string, price float\"\n");
+        printf("❌ Usage: create <database> --schema \"field1 type1, field2 type2, ...\" [-d directory]\n");
+        printf("❌    or: create <database> schema=\"field1 type1, field2 type2, ...\" [-d directory]\n");
+        printf("💡 Example: create products.fxdb --schema \"id int32, name string, price float\"\n");
+        printf("💡 Example: create products.fxdb schema=\"id int32, name string, price float\" -d ~/databases\n");
         return -1;
     }
 
     const char *db_name = cmd->args[1];
-
-    // Join all arguments after the database name to reconstruct the full command
-    // This handles the case where the schema contains spaces
-    char full_args[1024] = "";
+    const char *schema_str = NULL;
+    const char *directory = NULL;
+    
+    // Parse arguments looking for schema and directory options
     for (int i = 2; i < cmd->arg_count; i++)
     {
-        if (strlen(full_args) > 0)
+        const char *arg = cmd->args[i];
+        
+        // Handle --schema format (CLI style)
+        if (strcmp(arg, "--schema") == 0 && i + 1 < cmd->arg_count)
         {
-            strcat(full_args, " ");
+            schema_str = cmd->args[i + 1];
+            i++; // Skip next argument as it's the schema value
         }
-        strcat(full_args, cmd->args[i]);
+        // Handle -d or -p directory options
+        else if ((strcmp(arg, "-d") == 0 || strcmp(arg, "-p") == 0) && i + 1 < cmd->arg_count)
+        {
+            directory = cmd->args[i + 1];
+            i++; // Skip next argument as it's the directory value
+        }
+        // Handle schema= format (current shell style)
+        else if (strncmp(arg, "schema=", 7) == 0)
+        {
+            schema_str = arg + 7; // Skip "schema="
+        }
+        // Handle --directory= format
+        else if (strncmp(arg, "--directory=", 12) == 0)
+        {
+            directory = arg + 12; // Skip "--directory="
+        }
     }
 
-    // Find schema= in the full arguments
-    const char *schema_pos = strstr(full_args, "schema=");
-    if (!schema_pos)
+    if (!schema_str)
     {
-        printf("❌ Schema not specified. Use: create <database> schema=\"...\"\n");
-        printf("💡 Example: create products.fxdb schema=\"id int32, name string, price float\"\n");
+        printf("❌ Schema not specified. Use one of these formats:\n");
+        printf("   create <database> --schema \"field1 type1, field2 type2, ...\"\n");
+        printf("   create <database> schema=\"field1 type1, field2 type2, ...\"\n");
+        printf("💡 Example: create products.fxdb --schema \"id int32, name string, price float\"\n");
         return -1;
     }
 
-    const char *schema_str = schema_pos + 7; // Skip "schema="
-
-    // Remove quotes from schema if present
+    // Remove quotes from schema if present (for schema= format)
     char schema_buffer[1024];
     if (schema_str[0] == '"' || schema_str[0] == '\'')
     {
@@ -640,9 +659,12 @@ static int cmd_shell_create(shell_session_t *session, const parsed_command_t *cm
         }
         schema_str = schema_buffer;
     }
+    
+    // Use directory if specified, otherwise use session working directory
+    const char *working_dir = directory ? directory : session->working_dir;
 
     // Check if database already exists
-    if (database_exists(session->working_dir, db_name))
+    if (database_exists(working_dir, db_name))
     {
         printf("❌ Database already exists: %s\n", db_name);
         printf("💡 Use 'drop %s' first to remove it (when implemented).\n", db_name);
@@ -650,7 +672,7 @@ static int cmd_shell_create(shell_session_t *session, const parsed_command_t *cm
     }
 
     // Get full path
-    char *full_path = get_database_path(session->working_dir, db_name);
+    char *full_path = get_database_path(working_dir, db_name);
     if (!full_path)
     {
         printf("❌ Failed to build database path\n");
@@ -658,6 +680,10 @@ static int cmd_shell_create(shell_session_t *session, const parsed_command_t *cm
     }
 
     printf("🛠️  Creating database: %s\n", db_name);
+    if (directory)
+    {
+        printf("📁 Directory: %s\n", directory);
+    }
     printf("📋 Schema: %s\n\n", schema_str);
 
     schema_t *schema = parse_schema(schema_str);
