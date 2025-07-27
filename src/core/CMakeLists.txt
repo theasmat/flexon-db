@@ -3,6 +3,7 @@ set(CORE_SOURCES
     schema.c
     writer.c
     reader.c
+    data_types.c
 )
 
 add_library(flexondb_core STATIC ${CORE_SOURCES})

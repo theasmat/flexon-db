@@ -1,0 +1,89 @@
+{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "dev-debug",
+            "displayName": "Development Debug",
+            "description": "Debug build for development with extra tools",
+            "binaryDir": "build/dev-debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "DEV_MODE": "ON",
+                "ENABLE_TESTING": "ON",
+                "BUILD_BENCHMARKS": "ON",
+                "ENABLE_SUGGESTIONS": "ON"
+            }
+        },
+        {
+            "name": "dev-release",
+            "displayName": "Development Release",
+            "description": "Optimized build for development testing",
+            "binaryDir": "build/dev-release", 
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "DEV_MODE": "ON",
+                "ENABLE_TESTING": "ON",
+                "BUILD_BENCHMARKS": "OFF",
+                "ENABLE_SUGGESTIONS": "ON"
+            }
+        },
+        {
+            "name": "dev-test",
+            "displayName": "Development Test",
+            "description": "Test configuration with comprehensive testing enabled",
+            "binaryDir": "build/dev-test",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "DEV_MODE": "ON",
+                "ENABLE_TESTING": "ON",
+                "BUILD_BENCHMARKS": "ON",
+                "ENABLE_SUGGESTIONS": "OFF"
+            }
+        },
+        {
+            "name": "dev-profile",
+            "displayName": "Development Profile",
+            "description": "Profiling build with debug symbols and optimizations",
+            "binaryDir": "build/dev-profile",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "DEV_MODE": "ON",
+                "ENABLE_TESTING": "ON",
+                "BUILD_BENCHMARKS": "ON",
+                "ENABLE_SUGGESTIONS": "OFF"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "dev-debug",
+            "configurePreset": "dev-debug"
+        },
+        {
+            "name": "dev-release", 
+            "configurePreset": "dev-release"
+        },
+        {
+            "name": "dev-test",
+            "configurePreset": "dev-test"
+        },
+        {
+            "name": "dev-profile",
+            "configurePreset": "dev-profile"
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "dev-debug",
+            "configurePreset": "dev-debug"
+        },
+        {
+            "name": "dev-release",
+            "configurePreset": "dev-release"
+        },
+        {
+            "name": "dev-test",
+            "configurePreset": "dev-test"
+        }
+    ]
+}

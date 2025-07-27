@@ -1,0 +1,96 @@
+# Legacy Makefile for FlexonDB - CMake Backend
+# Provides quick test commands while using CMake as the backend
+
+.PHONY: test test-schema test-writer test-reader test-benchmarks help-dev clean setup
+
+# Default build directory for legacy commands
+BUILD_DIR := build/dev-debug
+BINARY_DIR := build/dist/linux/bin
+
+# Quick test commands (using CMake backend)
+test: setup
+	@echo "🧪 Running all FlexonDB tests..."
+	@cmake --build $(BUILD_DIR) --target test_schema test_writer test_reader
+	@echo "Running schema tests..."
+	@./$(BINARY_DIR)/test_schema
+	@echo "Running writer tests..."
+	@./$(BINARY_DIR)/test_writer
+	@echo "Running reader tests..."
+	@./$(BINARY_DIR)/test_reader
+	@echo "✅ All tests completed!"
+
+test-schema: setup
+	@echo "🧪 Running schema tests..."
+	@cmake --build $(BUILD_DIR) --target test_schema
+	@./$(BINARY_DIR)/test_schema
+
+test-writer: setup
+	@echo "🧪 Running writer tests..."
+	@cmake --build $(BUILD_DIR) --target test_writer
+	@./$(BINARY_DIR)/test_writer
+
+test-reader: setup
+	@echo "🧪 Running reader tests..."
+	@cmake --build $(BUILD_DIR) --target test_reader
+	@./$(BINARY_DIR)/test_reader
+
+test-benchmarks: setup
+	@echo "🚀 Running performance benchmarks..."
+	@cmake --build $(BUILD_DIR) --target flexon
+	@echo "Creating test database for benchmarks..."
+	@./$(BINARY_DIR)/flexon create benchmark_test.fxdb --schema "id int32, name string, score float, active bool"
+	@echo "Benchmark: Database creation completed"
+	@echo "Benchmark: Test data insertion..."
+	@for i in $$(seq 1 1000); do \
+		./$(BINARY_DIR)/flexon insert benchmark_test.fxdb --data "{\"id\": $$i, \"name\": \"User$$i\", \"score\": 95.5, \"active\": true}" >/dev/null; \
+	done
+	@echo "Benchmark: Reading data..."
+	@time ./$(BINARY_DIR)/flexon read benchmark_test.fxdb --limit 100 >/dev/null
+	@echo "Benchmark: Cleanup..."
+	@rm -f benchmark_test.fxdb
+	@echo "✅ Benchmarks completed!"
+
+# Ensure development build is configured and built
+setup:
+	@if [ ! -d "$(BUILD_DIR)" ]; then \
+		echo "🔧 Setting up development build..."; \
+		cmake --preset dev-debug; \
+	fi
+	@cmake --build $(BUILD_DIR)
+
+# Clean all build artifacts
+clean:
+	@echo "🧹 Cleaning build artifacts..."
+	@rm -rf build/
+	@rm -rf dist/
+	@rm -f *.fxdb
+	@echo "✅ Clean completed!"
+
+# Help for development commands
+help-dev:
+	@echo "🛠️ FlexonDB Development Commands"
+	@echo "================================="
+	@echo ""
+	@echo "CMAKE COMMANDS (Primary):"
+	@echo "  cmake --preset dev-debug        - Debug development build"
+	@echo "  cmake --preset dev-release      - Release development build"
+	@echo "  cmake --preset dev-test         - Test configuration build"
+	@echo "  cmake --preset dev-profile      - Profiling build"
+	@echo "  cmake --build build/dev-debug   - Build development version"
+	@echo "  cmake --build build/dev-debug --target test  - Run all tests"
+	@echo ""
+	@echo "LEGACY MAKE COMMANDS (Test Shortcuts):"
+	@echo "  make test                        - Run all tests"
+	@echo "  make test-schema                 - Test schema module"
+	@echo "  make test-writer                 - Test writer module"
+	@echo "  make test-reader                 - Test reader module"
+	@echo "  make test-benchmarks             - Run performance benchmarks"
+	@echo "  make setup                       - Configure and build development version"
+	@echo "  make clean                       - Clean all build artifacts"
+	@echo "  make help-dev                    - Show this help"
+	@echo ""
+	@echo "CROSS-PLATFORM BUILDS:"
+	@echo "  cmake -DBUILD_PLATFORM=auto -S . -B build/auto    - Auto-detect platform"
+	@echo "  cmake -DBUILD_PLATFORM=linux -S . -B build/linux - Linux build"
+	@echo "  cmake -DBUILD_PLATFORM=macos -S . -B build/macos - macOS build"
+	@echo "  cmake -DBUILD_PLATFORM=windows -S . -B build/win - Windows build"
