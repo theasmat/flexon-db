@@ -1,6 +1,5 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "../include/platform.h"
+#include "../include/compat.h"
 #include "../core/flexondb.h"
 
 #define COLOR_BLUE "\x1b[34m"
