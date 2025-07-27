@@ -1,11 +1,13 @@
 #define _GNU_SOURCE
 #include "../../include/schema.h"
+#include "../../include/writer.h"
 #include "../../include/utils.h"
 #include "../../include/error.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <errno.h>
 
 // Helper function to trim whitespace
 static char* trim_whitespace(char* str) {
@@ -229,18 +231,155 @@ void free_schema(schema_t* schema) {
     }
 }
 
-// Load schema from .fxdb file (placeholder - will be implemented when file format is defined)
-schema_t* load_schema(const char* filename __attribute__((unused))) {
-    // TODO: Implement when file format is defined
-    // This will read the header of .fxdb file and parse schema
-    fprintf(stderr, "load_schema: Not yet implemented\n");
-    return NULL;
+// Load schema from .fxdb file
+schema_t* load_schema(const char* filename) {
+    if (!filename) {
+        return NULL;
+    }
+    
+    FILE* file = fopen(filename, "rb");
+    if (!file) {
+        fprintf(stderr, "Error: Cannot open file '%s': %s\n", filename, strerror(errno));
+        return NULL;
+    }
+    
+    // Read header
+    fxdb_header_t header;
+    if (fread(&header, sizeof(fxdb_header_t), 1, file) != 1) {
+        fprintf(stderr, "Error: Cannot read header from '%s'\n", filename);
+        fclose(file);
+        return NULL;
+    }
+    
+    // Validate magic number
+    if (header.magic != FXDB_MAGIC_NUM) {
+        fprintf(stderr, "Error: Invalid file format - not a FlexonDB file\n");
+        fclose(file);
+        return NULL;
+    }
+    
+    // Seek to schema section
+    if (fseek(file, header.schema_offset, SEEK_SET) != 0) {
+        fprintf(stderr, "Error: Cannot seek to schema in '%s'\n", filename);
+        fclose(file);
+        return NULL;
+    }
+    
+    // Read schema metadata
+    uint32_t field_count, row_size, schema_str_len;
+    if (fread(&field_count, sizeof(uint32_t), 1, file) != 1 ||
+        fread(&row_size, sizeof(uint32_t), 1, file) != 1 ||
+        fread(&schema_str_len, sizeof(uint32_t), 1, file) != 1) {
+        fprintf(stderr, "Error: Cannot read schema metadata from '%s'\n", filename);
+        fclose(file);
+        return NULL;
+    }
+    
+    // Read schema string
+    char* schema_str = malloc(schema_str_len + 1);
+    if (!schema_str) {
+        fclose(file);
+        return NULL;
+    }
+    
+    if (fread(schema_str, 1, schema_str_len, file) != schema_str_len) {
+        fprintf(stderr, "Error: Cannot read schema string from '%s'\n", filename);
+        free(schema_str);
+        fclose(file);
+        return NULL;
+    }
+    schema_str[schema_str_len] = '\0';
+    
+    fclose(file);
+    
+    // Parse the schema string
+    schema_t* schema = parse_schema(schema_str);
+    free(schema_str);
+    
+    if (!schema) {
+        fprintf(stderr, "Error: Cannot parse schema from '%s'\n", filename);
+        return NULL;
+    }
+    
+    // Validate parsed schema matches file metadata
+    if (schema->field_count != field_count || schema->row_size != row_size) {
+        fprintf(stderr, "Error: Schema validation failed for '%s'\n", filename);
+        free_schema(schema);
+        return NULL;
+    }
+    
+    return schema;
 }
 
-// Save schema to .fxdb file (placeholder - will be implemented when file format is defined)
-int save_schema(const char* filename __attribute__((unused)), const schema_t* schema __attribute__((unused))) {
-    // TODO: Implement when file format is defined
-    // This will write schema to .fxdb file header
-    fprintf(stderr, "save_schema: Not yet implemented\n");
-    return -1;
+// Save schema to .fxdb file
+int save_schema(const char* filename, const schema_t* schema) {
+    if (!filename || !schema) {
+        return -1;
+    }
+    
+    FILE* file = fopen(filename, "r+b");
+    if (!file) {
+        fprintf(stderr, "Error: Cannot open file '%s' for writing: %s\n", filename, strerror(errno));
+        return -1;
+    }
+    
+    // Read current header to get schema offset
+    fxdb_header_t header;
+    if (fread(&header, sizeof(fxdb_header_t), 1, file) != 1) {
+        fprintf(stderr, "Error: Cannot read header from '%s'\n", filename);
+        fclose(file);
+        return -1;
+    }
+    
+    // Validate magic number
+    if (header.magic != FXDB_MAGIC_NUM) {
+        fprintf(stderr, "Error: Invalid file format - not a FlexonDB file\n");
+        fclose(file);
+        return -1;
+    }
+    
+    // Seek to schema section
+    if (fseek(file, header.schema_offset, SEEK_SET) != 0) {
+        fprintf(stderr, "Error: Cannot seek to schema in '%s'\n", filename);
+        fclose(file);
+        return -1;
+    }
+    
+    // Write schema metadata
+    uint32_t field_count = schema->field_count;
+    uint32_t row_size = schema->row_size;
+    uint32_t schema_str_len = schema->raw_schema_str ? strlen(schema->raw_schema_str) : 0;
+    
+    if (fwrite(&field_count, sizeof(uint32_t), 1, file) != 1 ||
+        fwrite(&row_size, sizeof(uint32_t), 1, file) != 1 ||
+        fwrite(&schema_str_len, sizeof(uint32_t), 1, file) != 1) {
+        fprintf(stderr, "Error: Cannot write schema metadata to '%s'\n", filename);
+        fclose(file);
+        return -1;
+    }
+    
+    // Write schema string if available
+    if (schema->raw_schema_str && schema_str_len > 0) {
+        if (fwrite(schema->raw_schema_str, 1, schema_str_len, file) != schema_str_len) {
+            fprintf(stderr, "Error: Cannot write schema string to '%s'\n", filename);
+            fclose(file);
+            return -1;
+        }
+    }
+    
+    // Write field definitions
+    for (uint32_t i = 0; i < schema->field_count; i++) {
+        const field_def_t* field = &schema->fields[i];
+        
+        if (fwrite(field->name, 1, MAX_FIELD_NAME_LEN, file) != MAX_FIELD_NAME_LEN ||
+            fwrite(&field->type, sizeof(field_type_t), 1, file) != 1 ||
+            fwrite(&field->size, sizeof(uint32_t), 1, file) != 1) {
+            fprintf(stderr, "Error: Cannot write field definition %u to '%s'\n", i, filename);
+            fclose(file);
+            return -1;
+        }
+    }
+    
+    fclose(file);
+    return 0;
 }

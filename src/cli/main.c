@@ -49,8 +49,8 @@ void print_usage(const char *program_name)
     printf("         Read and display rows from database\n\n");
     printf("  info   <file.fxdb> [-d directory] [-p path]\n");
     printf("         Show database information and schema\n\n");
-    printf("  dump   <file.fxdb> [-d directory] [-p path]\n");
-    printf("         Export all data in readable format\n\n");
+    printf("  dump   <file.fxdb> [--format csv|json|table] [-d directory] [-p path]\n");
+    printf("         Export all data in specified format (default: table)\n\n");
     printf("  list   [-d directory] [-p path]\n");
     printf("         List all .fxdb files in directory\n\n");
     printf("Options:\n");
@@ -65,12 +65,12 @@ void print_usage(const char *program_name)
     printf("Examples:\n");
     printf("  %s create people.fxdb --schema \"name string, age int32, salary float\"\n", program_name);
     printf("  %s create people.fxdb --schema \"name string, age int32\" -d /path/to/db\n", program_name);
-    printf("  %s create people.fxdb --schema \"name string, age int32\" -p /path/to/db\n", program_name);
     printf("  %s insert people.fxdb --data '{\"name\": \"Alice\", \"age\": 30}' -d /path/to/db\n", program_name);
     printf("  %s read people.fxdb --limit 10\n", program_name);
+    printf("  %s dump people.fxdb --format csv\n", program_name);
+    printf("  %s dump people.fxdb --format json -d /home/user/databases\n", program_name);
     printf("  %s info people.fxdb -d /home/user/databases\n", program_name);
     printf("  %s list -d /home/user/databases\n", program_name);
-    printf("  %s list -p /home/user/databases\n", program_name);
     printf("\n");
 }
 
@@ -97,6 +97,13 @@ int create_directory(const char *path)
 
     fprintf(stderr, "❌ Failed to create directory '%s': %s\n", path, strerror(errno));
     return -1;
+}
+
+// Helper function to check if file exists
+int file_exists(const char *path)
+{
+    struct stat st;
+    return stat(path, &st) == 0 && S_ISREG(st.st_mode);
 }
 
 // Cross-platform path joining function
@@ -478,6 +485,198 @@ int cmd_read(const char *filename, uint32_t limit, const char *directory)
     return 0;
 }
 
+// Insert command implementation
+int cmd_insert(const char *filename, const char *json_data, const char *directory)
+{
+    char *full_path = build_file_path(directory, filename);
+    if (!full_path)
+    {
+        printf("❌ Failed to build file path\n");
+        return 1;
+    }
+
+    // Check if database exists
+    if (!file_exists(full_path))
+    {
+        printf("❌ Database file does not exist: %s\n", full_path);
+        printf("💡 Use 'create' command to create a new database first\n");
+        free(full_path);
+        return 1;
+    }
+
+    // Open database for appending
+    writer_t *writer = writer_open(full_path);
+    if (!writer)
+    {
+        printf("❌ Failed to open database for insertion: %s\n", full_path);
+        free(full_path);
+        return 1;
+    }
+
+    printf("📝 Inserting data into: %s\n", full_path);
+    printf("🔍 Data: %s\n", json_data);
+
+    // Insert JSON data
+    if (writer_insert_json(writer, json_data) == 0)
+    {
+        printf("✅ Data inserted successfully\n");
+    }
+    else
+    {
+        printf("❌ Failed to insert data\n");
+        writer_close(writer);
+        writer_free(writer);
+        free(full_path);
+        return 1;
+    }
+
+    // Close writer
+    writer_close(writer);
+    writer_free(writer);
+    free(full_path);
+    return 0;
+}
+
+// Dump command implementation
+int cmd_dump(const char *filename, const char *format, const char *directory)
+{
+    char *full_path = build_file_path(directory, filename);
+    if (!full_path)
+    {
+        printf("❌ Failed to build file path\n");
+        return 1;
+    }
+
+    reader_t *reader = reader_open(full_path);
+    if (!reader)
+    {
+        printf("❌ Failed to open database: %s\n", full_path);
+        free(full_path);
+        return 1;
+    }
+
+    printf("📤 Dumping data from: %s\n", full_path);
+    
+    uint32_t total_rows = reader_get_row_count(reader);
+    if (total_rows == 0)
+    {
+        printf("📄 Database is empty\n");
+        reader_close(reader);
+        free(full_path);
+        return 0;
+    }
+
+    printf("📊 Format: %s | Total rows: %u\n\n", format ? format : "table", total_rows);
+
+    query_result_t *result = reader_read_rows(reader, total_rows);
+    if (!result)
+    {
+        printf("❌ Failed to read data\n");
+        reader_close(reader);
+        free(full_path);
+        return 1;
+    }
+
+    // Output in requested format
+    if (format && strcmp(format, "csv") == 0)
+    {
+        // CSV output
+        const schema_t *schema = reader->schema;
+        
+        // Print CSV header
+        for (uint32_t i = 0; i < schema->field_count; i++)
+        {
+            printf("%s", schema->fields[i].name);
+            if (i < schema->field_count - 1) printf(",");
+        }
+        printf("\n");
+        
+        // Print CSV data rows
+        for (uint32_t r = 0; r < result->row_count; r++)
+        {
+            const row_data_t *row = &result->rows[r];
+            for (uint32_t f = 0; f < row->field_count; f++)
+            {
+                const field_value_t *value = &row->values[f];
+                
+                switch (schema->fields[f].type)
+                {
+                    case TYPE_STRING:
+                        printf("\"%s\"", value->value.string_val ? value->value.string_val : "");
+                        break;
+                    case TYPE_INT32:
+                        printf("%d", value->value.int32_val);
+                        break;
+                    case TYPE_FLOAT:
+                        printf("%.2f", value->value.float_val);
+                        break;
+                    case TYPE_BOOL:
+                        printf("%s", value->value.bool_val ? "true" : "false");
+                        break;
+                    default:
+                        printf("null");
+                        break;
+                }
+                if (f < row->field_count - 1) printf(",");
+            }
+            printf("\n");
+        }
+    }
+    else if (format && strcmp(format, "json") == 0)
+    {
+        // JSON output
+        const schema_t *schema = reader->schema;
+        
+        printf("[\n");
+        for (uint32_t r = 0; r < result->row_count; r++)
+        {
+            const row_data_t *row = &result->rows[r];
+            printf("  {");
+            
+            for (uint32_t f = 0; f < row->field_count; f++)
+            {
+                const field_value_t *value = &row->values[f];
+                printf("\"%s\": ", schema->fields[f].name);
+                
+                switch (schema->fields[f].type)
+                {
+                    case TYPE_STRING:
+                        printf("\"%s\"", value->value.string_val ? value->value.string_val : "");
+                        break;
+                    case TYPE_INT32:
+                        printf("%d", value->value.int32_val);
+                        break;
+                    case TYPE_FLOAT:
+                        printf("%.2f", value->value.float_val);
+                        break;
+                    case TYPE_BOOL:
+                        printf("%s", value->value.bool_val ? "true" : "false");
+                        break;
+                    default:
+                        printf("null");
+                        break;
+                }
+                if (f < row->field_count - 1) printf(", ");
+            }
+            
+            printf("}");
+            if (r < result->row_count - 1) printf(",");
+            printf("\n");
+        }
+        printf("]\n");
+    }
+    else
+    {
+        // Default table output
+        reader_print_rows(reader, result);
+    }
+
+    reader_free_result(result);
+    reader_close(reader);
+    free(full_path);
+    return 0;
+}
+
 // Parse command line arguments with directory support
 int main(int argc, char *argv[])
 {
@@ -561,15 +760,34 @@ int main(int argc, char *argv[])
     }
     else if (strcmp(command, "insert") == 0)
     {
-        printf("❌ Insert command not yet implemented\n");
-        printf("💡 Use the test programs to add sample data for now\n");
-        return 1;
+        if (argc < 5 || strcmp(argv[3], "--data") != 0)
+        {
+            printf("❌ Insert command requires: insert <file.fxdb> --data '<json>'\n");
+            printf("💡 Example: %s insert people.fxdb --data '{\"name\": \"Alice\", \"age\": 30}'\n", argv[0]);
+            return 1;
+        }
+        return cmd_insert(argv[2], argv[4], directory);
     }
     else if (strcmp(command, "dump") == 0)
     {
-        printf("❌ Dump command not yet implemented\n");
-        printf("💡 Use 'read' command to view data for now\n");
-        return 1;
+        if (argc < 3)
+        {
+            printf("❌ Dump command requires: dump <file.fxdb> [--format csv|json|table]\n");
+            return 1;
+        }
+        
+        // Check for format option
+        const char* format = "table"; // default
+        for (int i = 3; i < argc; i++)
+        {
+            if (strcmp(argv[i], "--format") == 0 && i + 1 < argc)
+            {
+                format = argv[i + 1];
+                break;
+            }
+        }
+        
+        return cmd_dump(argv[2], format, directory);
     }
     else
     {
