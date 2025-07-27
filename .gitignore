@@ -1,8 +1,17 @@
 # Build artifacts
 build/
 cmake-build/
+dist/
 *.o
 *.dSYM/
+
+# CMake files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+install_manifest.txt
+Makefile
+*.make
 
 # Database files (for testing)
 *.fxdb
@@ -20,3 +29,19 @@ test_databases/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Platform-specific
+# Windows
+*.exe.manifest
+*.exe.intermediate.manifest
+*.lib
+*.exp
+*.pdb
+
+# Android
+*.apk
+*.so
+
+# iOS
+*.app
+*.ipa
