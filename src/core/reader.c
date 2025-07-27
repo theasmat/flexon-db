@@ -466,10 +466,34 @@ void reader_free_result(query_result_t* result) {
 }
 
 // Seek to specific row number (placeholder)
-int reader_seek_row(reader_t* reader __attribute__((unused)), uint32_t row_number __attribute__((unused))) {
-    // TODO: Implement efficient seeking
-    fprintf(stderr, "reader_seek_row: Not yet implemented\n");
-    return -1;
+int reader_seek_row(reader_t* reader, uint32_t row_number) {
+    if (!reader || !reader->file || !reader->schema) {
+        return -1;
+    }
+    
+    // Check if row_number is valid
+    if (row_number >= reader->header.total_rows) {
+        fprintf(stderr, "Error: Row number %u exceeds total rows (%u)\n", 
+                row_number, reader->header.total_rows);
+        return -1;
+    }
+    
+    // Calculate which chunk contains the target row
+    uint32_t chunk_index = row_number / reader->header.chunk_size;
+    uint32_t row_in_chunk = row_number % reader->header.chunk_size;
+    
+    // Load the appropriate chunk if not already loaded
+    if (reader->current_chunk != chunk_index) {
+        if (reader_load_chunk(reader, chunk_index) != 0) {
+            fprintf(stderr, "Error: Failed to load chunk %u\n", chunk_index);
+            return -1;
+        }
+    }
+    
+    // Set current position within the chunk
+    reader->current_row = row_in_chunk;
+    
+    return 0;
 }
 
 /* ============================================================================
