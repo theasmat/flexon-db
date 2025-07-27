@@ -1,0 +1,217 @@
+CC = gcc
+CFLAGS = -Wall -Wextra -std=c99 -g -O2
+INCLUDES = -Iinclude -I.
+SRCDIR = src
+BUILDDIR = build
+COREDIR = core
+CLIDIR = cli
+
+# Create build directory
+$(BUILDDIR):
+	mkdir -p $(BUILDDIR)
+
+# Common utilities
+$(BUILDDIR)/logo.o: $(SRCDIR)/common/logo.c include/logo.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+	
+$(BUILDDIR)/welcome.o: $(SRCDIR)/common/welcome.c include/welcome.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+$(BUILDDIR)/error.o: $(SRCDIR)/common/error.c include/error.h include/config.h include/types.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+$(BUILDDIR)/utils.o: $(SRCDIR)/common/utils.c include/utils.h include/error.h include/types.h include/config.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+$(BUILDDIR)/io_utils.o: $(SRCDIR)/common/io_utils.c include/io_utils.h include/config.h include/types.h include/error.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+# Core database modules
+$(BUILDDIR)/schema.o: $(SRCDIR)/core/schema.c include/schema.h include/config.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+$(BUILDDIR)/writer.o: $(SRCDIR)/core/writer.c include/writer.h include/schema.h include/config.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+$(BUILDDIR)/reader.o: $(SRCDIR)/core/reader.c include/reader.h include/schema.h include/writer.h include/config.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+# New core API
+$(BUILDDIR)/flexondb.o: $(COREDIR)/flexondb.c $(COREDIR)/flexondb.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+# Shell modules
+$(BUILDDIR)/session.o: $(SRCDIR)/shell/session.c include/shell.h include/config.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+$(BUILDDIR)/formatter.o: $(SRCDIR)/shell/formatter.c include/shell.h include/config.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+$(BUILDDIR)/parser.o: $(SRCDIR)/shell/parser.c include/shell.h include/config.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+$(BUILDDIR)/shell.o: $(SRCDIR)/shell/shell.c include/shell.h include/config.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+# CLI main entry point (original)
+$(BUILDDIR)/main.o: $(SRCDIR)/cli/main.c include/schema.h include/writer.h include/reader.h include/shell.h include/config.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+# New CLI tools
+$(BUILDDIR)/cli_main.o: $(CLIDIR)/main.c $(COREDIR)/flexondb.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+$(BUILDDIR)/cli_shell.o: $(CLIDIR)/shell.c $(COREDIR)/flexondb.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+# Object groups
+COMMON_OBJS = $(BUILDDIR)/error.o $(BUILDDIR)/utils.o $(BUILDDIR)/io_utils.o $(BUILDDIR)/logo.o $(BUILDDIR)/welcome.o
+CORE_OBJS = $(BUILDDIR)/schema.o $(BUILDDIR)/writer.o $(BUILDDIR)/reader.o
+SHELL_OBJS = $(BUILDDIR)/session.o $(BUILDDIR)/formatter.o $(BUILDDIR)/parser.o $(BUILDDIR)/shell.o
+CLI_OBJS = $(BUILDDIR)/main.o
+FLEXONDB_OBJS = $(BUILDDIR)/flexondb.o
+
+# Main CLI tool (original)
+$(BUILDDIR)/flexon: $(CLI_OBJS) $(CORE_OBJS) $(SHELL_OBJS) $(COMMON_OBJS) | $(BUILDDIR)
+	$(CC) $(CFLAGS) $^ -o $@ -lreadline
+
+# New CLI tools
+$(BUILDDIR)/flexondb-cli: $(BUILDDIR)/cli_main.o $(FLEXONDB_OBJS) $(CORE_OBJS) $(COMMON_OBJS) | $(BUILDDIR)
+	$(CC) $(CFLAGS) $^ -o $@
+
+$(BUILDDIR)/flexondb-shell: $(BUILDDIR)/cli_shell.o $(FLEXONDB_OBJS) $(CORE_OBJS) $(COMMON_OBJS) | $(BUILDDIR)
+	$(CC) $(CFLAGS) $^ -o $@
+
+# Test programs
+$(BUILDDIR)/test_schema: examples/test_schema.c $(BUILDDIR)/schema.o | $(BUILDDIR)
+	$(CC) $(CFLAGS) $(INCLUDES) $^ -o $@
+
+$(BUILDDIR)/test_writer: examples/test_writer.c $(CORE_OBJS) $(COMMON_OBJS) | $(BUILDDIR)
+	$(CC) $(CFLAGS) $(INCLUDES) $^ -o $@
+
+$(BUILDDIR)/test_reader: examples/test_reader.c $(CORE_OBJS) $(COMMON_OBJS) | $(BUILDDIR)
+	$(CC) $(CFLAGS) $(INCLUDES) $^ -o $@
+
+# Configuration demo
+$(BUILDDIR)/test_config: test_config.c $(COMMON_OBJS) | $(BUILDDIR)
+	$(CC) $(CFLAGS) $(INCLUDES) $^ -o $@
+
+# Build all
+all: $(BUILDDIR)/flexon $(BUILDDIR)/flexondb-cli $(BUILDDIR)/flexondb-shell $(BUILDDIR)/test_schema $(BUILDDIR)/test_writer $(BUILDDIR)/test_reader $(BUILDDIR)/test_config
+
+# Individual module builds
+core: $(CORE_OBJS)
+shell: $(SHELL_OBJS)
+common: $(COMMON_OBJS)
+cli: $(CLI_OBJS)
+flexondb: $(FLEXONDB_OBJS)
+
+# New CLI builds
+cli-tools: $(BUILDDIR)/flexondb-cli $(BUILDDIR)/flexondb-shell
+
+# Individual tests
+test-schema: $(BUILDDIR)/test_schema
+	./$(BUILDDIR)/test_schema
+
+test-writer: $(BUILDDIR)/test_writer
+	./$(BUILDDIR)/test_writer
+
+test-reader: $(BUILDDIR)/test_reader
+	./$(BUILDDIR)/test_reader
+
+test-config: $(BUILDDIR)/test_config
+	./$(BUILDDIR)/test_config
+
+# Test CLI tools
+test-cli: $(BUILDDIR)/flexondb-cli
+	@echo "Testing FlexonDB CLI tools..."
+	./$(BUILDDIR)/flexondb-cli
+
+test-shell: $(BUILDDIR)/flexondb-shell
+	@echo "Testing FlexonDB Shell (enter 'exit' to quit)..."
+	./$(BUILDDIR)/flexondb-shell
+
+# Test all modules
+test: test-schema test-writer test-reader
+
+# Advanced CLI demo with directory support
+demo-advanced: $(BUILDDIR)/flexon
+	@echo "🚀 FlexonDB Advanced CLI Demo"
+	@echo "=============================="
+	@echo ""
+	@echo "Creating databases in different directories..."
+	mkdir -p demo_databases
+	./$(BUILDDIR)/flexon create employees.fxdb --schema "name string, age int32, department string, salary float" -d demo_databases
+	./$(BUILDDIR)/flexon create products.fxdb --schema "id int32, name string, price float, available bool"
+	@echo ""
+	@echo "Listing databases..."
+	@echo "📂 Current directory:"
+	./$(BUILDDIR)/flexon list
+	@echo ""
+	@echo "📂 demo_databases directory:"
+	./$(BUILDDIR)/flexon list -d demo_databases
+	@echo ""
+	@echo "Database info:"
+	./$(BUILDDIR)/flexon info employees.fxdb -d demo_databases
+	@echo ""
+	@echo "💡 Use test_writer to add data, then read with:"
+	@echo "   ./build/flexon read <file.fxdb> [-d directory]"
+
+# Demo new CLI tools
+demo-cli: $(BUILDDIR)/flexondb-cli
+	@echo "🚀 FlexonDB New CLI Demo"
+	@echo "========================"
+	@echo ""
+	@echo "Creating test database..."
+	./$(BUILDDIR)/flexondb-cli create test.fxdb "name string, age int32"
+	@echo ""
+	@echo "Reading from test database..."
+	./$(BUILDDIR)/flexondb-cli read test.fxdb
+	@echo ""
+	@echo "💡 For more commands, run: ./build/flexondb-cli"
+
+# Install (copy to /usr/local/bin)
+install: $(BUILDDIR)/flexon $(BUILDDIR)/flexondb-cli $(BUILDDIR)/flexondb-shell
+	sudo cp $(BUILDDIR)/flexon /usr/local/bin/
+	sudo cp $(BUILDDIR)/flexondb-cli /usr/local/bin/
+	sudo cp $(BUILDDIR)/flexondb-shell /usr/local/bin/
+
+# Clean targets
+clean:
+	rm -rf $(BUILDDIR) *.fxdb demo_databases test_databases
+
+clean-core:
+	rm -f $(CORE_OBJS)
+
+clean-shell:
+	rm -f $(SHELL_OBJS)
+
+clean-common:
+	rm -f $(COMMON_OBJS)
+
+clean-flexondb:
+	rm -f $(FLEXONDB_OBJS)
+
+# Help target
+help:
+	@echo "FlexonDB Build System"
+	@echo "====================="
+	@echo ""
+	@echo "Available targets:"
+	@echo "  all           - Build everything"
+	@echo "  core          - Build core database modules"
+	@echo "  shell         - Build shell modules"
+	@echo "  common        - Build common utilities"
+	@echo "  cli           - Build CLI entry point"
+	@echo "  flexondb      - Build new FlexonDB API"
+	@echo "  cli-tools     - Build new CLI tools"
+	@echo "  test          - Run all tests"
+	@echo "  test-cli      - Test new CLI tool"
+	@echo "  test-shell    - Test new shell tool"
+	@echo "  demo-advanced - Run advanced demo"
+	@echo "  demo-cli      - Demo new CLI tools"
+	@echo "  clean         - Clean all build artifacts"
+	@echo "  install       - Install to /usr/local/bin"
+	@echo "  help          - Show this help"
+
+.PHONY: all core shell common cli flexondb cli-tools test test-schema test-writer test-reader test-config test-cli test-shell demo-advanced demo-cli install clean clean-core clean-shell clean-common clean-flexondb help
