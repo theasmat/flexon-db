@@ -1,4 +1,3 @@
-#define _POSIX_C_SOURCE 199309L
 #define _DEFAULT_SOURCE
 #include "../../include/io_utils.h"
 #include "../../include/error.h"

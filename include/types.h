@@ -8,7 +8,7 @@
  * It only includes types that don't have circular dependencies.
  */
 
-#define _POSIX_C_SOURCE 199309L
+
 #include "config.h"
 #include <stdint.h>
 #include <stdio.h>

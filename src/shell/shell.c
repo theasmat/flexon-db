@@ -1,17 +1,6 @@
+// shell.c
+
 #define _GNU_SOURCE
-
-// macOS readline compatibility
-#ifdef __APPLE__
-#define _DEFAULT_SOURCE
-// On macOS, some readline functions may need explicit declarations
-#ifndef _FUNCTION_DEF
-#define _FUNCTION_DEF
-extern void rl_replace_line(const char *, int);
-extern int rl_on_new_line(void);
-extern int rl_redisplay(void);
-#endif
-#endif
-
 #include "../../include/shell.h"
 #include "../../include/welcome.h"
 #include <stdio.h>
@@ -21,10 +10,18 @@ extern int rl_redisplay(void);
 #include <sys/stat.h>
 #include <time.h>
 #include <signal.h>
+
+#if defined(__APPLE__)
+// macOS uses libedit's readline
+#include <editline/readline.h>
+#else
+// Linux / GNU systems
 #include <readline/readline.h>
 #include <readline/history.h>
+#endif
 
 // External logo from main.c
+
 extern const char *logo;
 
 // Global flag for signal handling
@@ -37,12 +34,17 @@ static void sigint_handler(int sig)
 {
     (void)sig; // Unused parameter
     interrupt_received = 1;
+
     printf(COLOR_WARNING "\n🛑 Caught Ctrl+C! Use " COLOR_EMPHASIS "'quit'" COLOR_WARNING ", " COLOR_EMPHASIS "'exit'" COLOR_WARNING ", or " COLOR_EMPHASIS "'q'" COLOR_WARNING " to exit gracefully." COLOR_RESET "\n");
+
     rl_on_new_line();
-    rl_replace_line("", 0);
+
+#if !defined(__APPLE__)
+    rl_replace_line("", 0); // Only available in GNU Readline
+#endif
+
     rl_redisplay();
 }
-
 /**
  * Setup signal handlers
  */
