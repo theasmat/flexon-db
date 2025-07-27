@@ -1,37 +1,16 @@
 #include "flexondb.h"
-
-// Cross-platform includes
-#ifdef __ANDROID__
-    #include <android/log.h>
-    #define FLEXON_LOG(...) __android_log_print(ANDROID_LOG_INFO, "FlexonDB", __VA_ARGS__)
-#elif __APPLE__
-    #include <os/log.h>
-    #define FLEXON_LOG(...) os_log(OS_LOG_DEFAULT, __VA_ARGS__)
-#else
-    #define FLEXON_LOG(...) printf(__VA_ARGS__)
-#endif
-
-// Enable GNU extensions for strdup
-#define _GNU_SOURCE
-
+#include "../include/platform.h"
+#include "../include/compat.h"
 #include "../include/schema.h"
 #include "../include/writer.h"
 #include "../include/reader.h"
 #include "../include/io_utils.h"
 #include "../include/types.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdbool.h>
 
-// Helper function to safely duplicate a string
+// Helper function to safely duplicate a string (use compatibility layer)
 static char* safe_strdup(const char* str) {
     if (!str) return NULL;
-    size_t len = strlen(str);
-    char* copy = malloc(len + 1);
-    if (!copy) return NULL;
-    strcpy(copy, str);
-    return copy;
+    return strdup(str); // This will use our compatibility strdup if needed
 }
 
 // Helper function to build a simple CSV parser

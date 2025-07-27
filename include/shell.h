@@ -1,11 +1,13 @@
 #ifndef SHELL_H
 #define SHELL_H
 
+#include "platform.h"
+#include "compat.h"
 #include "schema.h"
 #include "reader.h"
 #include "writer.h"
-#include <stdint.h>
-#include <stdbool.h>
+
+/* Ensure time.h is included for struct timespec */
 #include <time.h>
 
 // Maximum command line length

@@ -58,28 +58,46 @@ $(BUILDDIR)/shell.o: $(SHELL_SRCDIR)/shell.c include/shell.h include/config.h | 
 $(BUILDDIR)/main.o: $(CLI_SRCDIR)/main.c include/schema.h include/writer.h include/reader.h include/shell.h include/config.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
-# Object groups
+# Compatibility layer
+$(BUILDDIR)/compat.o: $(SRCDIR)/compat/compat.c include/compat.h include/platform.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+# Object groups  
+COMPAT_OBJS = $(BUILDDIR)/compat.o
 COMMON_OBJS = $(BUILDDIR)/error.o $(BUILDDIR)/utils.o $(BUILDDIR)/io_utils.o $(BUILDDIR)/logo.o $(BUILDDIR)/welcome.o
 CORE_OBJS = $(BUILDDIR)/schema.o $(BUILDDIR)/writer.o $(BUILDDIR)/reader.o
 SHELL_OBJS = $(BUILDDIR)/session.o $(BUILDDIR)/formatter.o $(BUILDDIR)/parser.o $(BUILDDIR)/shell.o
 CLI_OBJS = $(BUILDDIR)/main.o
 
-# Main CLI tool
-$(BUILDDIR)/flexon: $(CLI_OBJS) $(CORE_OBJS) $(SHELL_OBJS) $(COMMON_OBJS) | $(BUILDDIR)
-	$(CC) $(CFLAGS) $^ -o $@ -lreadline
+# Main CLI tool (try readline, fall back to no readline if not available)
+$(BUILDDIR)/flexon: $(CLI_OBJS) $(CORE_OBJS) $(SHELL_OBJS) $(COMMON_OBJS) $(COMPAT_OBJS) | $(BUILDDIR)
+	@echo "Attempting to link with readline..."
+	@if pkg-config --exists readline 2>/dev/null; then \
+		echo "Found readline via pkg-config"; \
+		$(CC) $(CFLAGS) $^ -o $@ $$(pkg-config --libs readline); \
+	elif [ -f /usr/lib/libreadline.so ] || [ -f /usr/lib/x86_64-linux-gnu/libreadline.so ] || [ -f /usr/local/lib/libreadline.so ]; then \
+		echo "Found readline library"; \
+		$(CC) $(CFLAGS) $^ -o $@ -lreadline; \
+	elif [ -f /usr/lib/libedit.so ] || [ -f /usr/lib/x86_64-linux-gnu/libedit.so ] || [ -f /usr/local/lib/libedit.so ]; then \
+		echo "Found libedit library"; \
+		$(CC) $(CFLAGS) $^ -o $@ -ledit; \
+	else \
+		echo "No readline found, building without readline support"; \
+		$(CC) $(CFLAGS) -DFLEXON_NO_READLINE $^ -o $@; \
+	fi
 
 # Test programs
-$(BUILDDIR)/test_schema: $(EXAMPLEDIR)/test_schema.c $(BUILDDIR)/schema.o | $(BUILDDIR)
+$(BUILDDIR)/test_schema: $(EXAMPLEDIR)/test_schema.c $(BUILDDIR)/schema.o $(COMPAT_OBJS) | $(BUILDDIR)
 	$(CC) $(CFLAGS) $(INCLUDES) $^ -o $@
 
-$(BUILDDIR)/test_writer: $(EXAMPLEDIR)/test_writer.c $(CORE_OBJS) $(COMMON_OBJS) | $(BUILDDIR)
+$(BUILDDIR)/test_writer: $(EXAMPLEDIR)/test_writer.c $(CORE_OBJS) $(COMMON_OBJS) $(COMPAT_OBJS) | $(BUILDDIR)
 	$(CC) $(CFLAGS) $(INCLUDES) $^ -o $@
 
-$(BUILDDIR)/test_reader: $(EXAMPLEDIR)/test_reader.c $(CORE_OBJS) $(COMMON_OBJS) | $(BUILDDIR)
+$(BUILDDIR)/test_reader: $(EXAMPLEDIR)/test_reader.c $(CORE_OBJS) $(COMMON_OBJS) $(COMPAT_OBJS) | $(BUILDDIR)
 	$(CC) $(CFLAGS) $(INCLUDES) $^ -o $@
 
 # Configuration demo
-$(BUILDDIR)/test_config: test_config.c $(COMMON_OBJS) | $(BUILDDIR)
+$(BUILDDIR)/test_config: test_config.c $(COMMON_OBJS) $(COMPAT_OBJS) | $(BUILDDIR)
 	$(CC) $(CFLAGS) $(INCLUDES) $^ -o $@
 
 # Build all

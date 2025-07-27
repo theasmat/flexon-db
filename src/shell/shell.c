@@ -1,24 +1,9 @@
 // shell.c
 
-#define _GNU_SOURCE
+#include "../../include/platform.h"
+#include "../../include/compat.h"
 #include "../../include/shell.h"
 #include "../../include/welcome.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <sys/stat.h>
-#include <time.h>
-#include <signal.h>
-
-#if defined(__APPLE__)
-// macOS uses libedit's readline
-#include <editline/readline.h>
-#else
-// Linux / GNU systems
-#include <readline/readline.h>
-#include <readline/history.h>
-#endif
 
 // External logo from main.c
 
@@ -30,6 +15,7 @@ static volatile int interrupt_received = 0;
 /**
  * Signal handler for SIGINT (Ctrl+C)
  */
+#ifdef FLEXON_HAVE_SIGNALS
 static void sigint_handler(int sig)
 {
     (void)sig; // Unused parameter
@@ -38,24 +24,31 @@ static void sigint_handler(int sig)
     printf(COLOR_WARNING "\n🛑 Caught Ctrl+C! Use " COLOR_EMPHASIS "'quit'" COLOR_WARNING ", " COLOR_EMPHASIS "'exit'" COLOR_WARNING ", or " COLOR_EMPHASIS "'q'" COLOR_WARNING " to exit gracefully." COLOR_RESET "\n");
 
     rl_on_new_line();
-
-#if !defined(__APPLE__)
-    rl_replace_line("", 0); // Only available in GNU Readline
-#endif
-
+    rl_replace_line("", 0); 
     rl_redisplay();
 }
+
 /**
  * Setup signal handlers
  */
 static void setup_signal_handlers(void)
 {
+#ifdef FLEXON_HAVE_POSIX
     struct sigaction sa;
     sa.sa_handler = sigint_handler;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_RESTART;
     sigaction(SIGINT, &sa, NULL);
+#elif defined(FLEXON_PLATFORM_WINDOWS)
+    signal(SIGINT, sigint_handler);
+#endif
 }
+#else
+/* No signal handling available */
+static void setup_signal_handlers(void) {
+    /* No-op on platforms without signal support */
+}
+#endif
 
 /**
  * Custom readline prompt generator
