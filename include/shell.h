@@ -13,6 +13,50 @@
 #define MAX_DATABASE_NAME_LEN 256
 #define MAX_PATH_LEN 512
 
+// ANSI Color codes for enhanced output
+#define COLOR_RESET     "\033[0m"
+#define COLOR_BOLD      "\033[1m"
+#define COLOR_DIM       "\033[2m"
+
+// Foreground colors
+#define COLOR_BLACK     "\033[30m"
+#define COLOR_RED       "\033[31m"
+#define COLOR_GREEN     "\033[32m"
+#define COLOR_YELLOW    "\033[33m"
+#define COLOR_BLUE      "\033[34m"
+#define COLOR_MAGENTA   "\033[35m"
+#define COLOR_CYAN      "\033[36m"
+#define COLOR_WHITE     "\033[37m"
+
+// Bright colors
+#define COLOR_BR_BLACK  "\033[90m"
+#define COLOR_BR_RED    "\033[91m"
+#define COLOR_BR_GREEN  "\033[92m"
+#define COLOR_BR_YELLOW "\033[93m"
+#define COLOR_BR_BLUE   "\033[94m"
+#define COLOR_BR_MAGENTA "\033[95m"
+#define COLOR_BR_CYAN   "\033[96m"
+#define COLOR_BR_WHITE  "\033[97m"
+
+// Background colors
+#define COLOR_BG_BLACK  "\033[40m"
+#define COLOR_BG_RED    "\033[41m"
+#define COLOR_BG_GREEN  "\033[42m"
+#define COLOR_BG_YELLOW "\033[43m"
+#define COLOR_BG_BLUE   "\033[44m"
+#define COLOR_BG_MAGENTA "\033[45m"
+#define COLOR_BG_CYAN   "\033[46m"
+#define COLOR_BG_WHITE  "\033[47m"
+
+// Semantic color aliases for shell components
+#define COLOR_SUCCESS   COLOR_BR_GREEN
+#define COLOR_ERROR     COLOR_BR_RED
+#define COLOR_WARNING   COLOR_BR_YELLOW
+#define COLOR_INFO      COLOR_BR_CYAN
+#define COLOR_PROMPT    COLOR_BR_BLUE COLOR_BOLD
+#define COLOR_EMPHASIS  COLOR_BR_WHITE COLOR_BOLD
+#define COLOR_MUTED     COLOR_BR_BLACK
+
 // Shell session information
 typedef struct {
     char user[64];              // Current user
@@ -67,11 +111,6 @@ shell_session_t* init_session(const char* directory);
  * Print welcome screen with logo and session info
  */
 void print_welcome_screen(const shell_session_t* session);
-
-/**
- * Print shell prompt based on current state
- */
-void print_prompt(const shell_session_t* session);
 
 /**
  * Execute a shell command

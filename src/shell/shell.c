@@ -7,9 +7,68 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <signal.h>
+#include <readline/readline.h>
+#include <readline/history.h>
 
 // External logo from main.c
 extern const char *logo;
+
+// Global flag for signal handling
+static volatile int interrupt_received = 0;
+
+/**
+ * Signal handler for SIGINT (Ctrl+C)
+ */
+static void sigint_handler(int sig)
+{
+    (void)sig; // Unused parameter
+    interrupt_received = 1;
+    printf(COLOR_WARNING "\n🛑 Caught Ctrl+C! Use " COLOR_EMPHASIS "'quit'" COLOR_WARNING ", " COLOR_EMPHASIS "'exit'" COLOR_WARNING ", or " COLOR_EMPHASIS "'q'" COLOR_WARNING " to exit gracefully." COLOR_RESET "\n");
+    rl_on_new_line();
+    rl_replace_line("", 0);
+    rl_redisplay();
+}
+
+/**
+ * Setup signal handlers
+ */
+static void setup_signal_handlers(void)
+{
+    struct sigaction sa;
+    sa.sa_handler = sigint_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART;
+    sigaction(SIGINT, &sa, NULL);
+}
+
+/**
+ * Custom readline prompt generator
+ */
+static char* generate_prompt(const shell_session_t *session)
+{
+    static char prompt[256];
+    
+    if (strlen(session->current_db) > 0)
+    {
+        // Extract database name without .fxdb extension for cleaner display
+        char db_name[MAX_DATABASE_NAME_LEN];
+        strncpy(db_name, session->current_db, sizeof(db_name) - 1);
+        db_name[sizeof(db_name) - 1] = '\0';
+
+        char *ext = strstr(db_name, ".fxdb");
+        if (ext)
+            *ext = '\0';
+
+        snprintf(prompt, sizeof(prompt), COLOR_PROMPT "flexondb:" COLOR_EMPHASIS "%s" COLOR_PROMPT "> " COLOR_RESET, db_name);
+    }
+    else
+    {
+        snprintf(prompt, sizeof(prompt), COLOR_PROMPT "flexondb> " COLOR_RESET);
+    }
+    
+    return prompt;
+}
 
 /**
  * Initialize shell session
@@ -96,38 +155,13 @@ void print_welcome_screen(const shell_session_t *session)
 }
 
 /**
- * Print shell prompt based on current state
- */
-void print_prompt(const shell_session_t *session)
-{
-    if (strlen(session->current_db) > 0)
-    {
-        // Extract database name without .fxdb extension for cleaner display
-        char db_name[MAX_DATABASE_NAME_LEN];
-        strncpy(db_name, session->current_db, sizeof(db_name) - 1);
-        db_name[sizeof(db_name) - 1] = '\0';
-
-        char *ext = strstr(db_name, ".fxdb");
-        if (ext)
-            *ext = '\0';
-
-        printf("flexondb:%s> ", db_name);
-    }
-    else
-    {
-        printf("flexondb> ");
-    }
-    fflush(stdout);
-}
-
-/**
  * Print goodbye message with session statistics
  */
 void print_goodbye(const shell_session_t *session)
 {
     printf("\n");
-    printf("👋 Goodbye from FlexonDB!\n");
-    printf("═══════════════════════════\n\n");
+    printf(COLOR_SUCCESS "👋 Goodbye from FlexonDB!" COLOR_RESET "\n");
+    printf(COLOR_MUTED "═══════════════════════════" COLOR_RESET "\n\n");
 
     // Calculate session duration
     time_t end_time = time(NULL);
@@ -224,8 +258,8 @@ int execute_shell_command(shell_session_t *session, const parsed_command_t *cmd)
 
     case CMD_UNKNOWN:
     default:
-        printf("❌ Unknown command: %s\n", cmd->args[0] ? cmd->args[0] : "");
-        printf("💡 Type 'help' for available commands.\n");
+        printf(COLOR_ERROR "❌ Unknown command: " COLOR_RESET "%s\n", cmd->args[0] ? cmd->args[0] : "");
+        printf(COLOR_INFO "💡 Type 'help' for available commands." COLOR_RESET "\n");
         result = -1;
         break;
     }
@@ -238,7 +272,7 @@ int execute_shell_command(shell_session_t *session, const parsed_command_t *cmd)
         double elapsed = end_timing(&timing);
         if (elapsed > 10.0)
         { // Only show timing for commands that take > 10ms
-            printf("⏱️  Command completed in %.1f ms\n", elapsed);
+            printf(COLOR_MUTED "⏱️  Command completed in %.1f ms" COLOR_RESET "\n", elapsed);
         }
     }
 
@@ -595,37 +629,56 @@ static int cmd_shell_create(shell_session_t *session, const parsed_command_t *cm
 {
     if (cmd->arg_count < 2)
     {
-        printf("❌ Usage: create <database> schema=\"field1 type1, field2 type2, ...\"\n");
-        printf("💡 Example: create products.fxdb schema=\"id int32, name string, price float\"\n");
+        printf(COLOR_ERROR "❌ Usage:" COLOR_RESET " create <database> --schema \"field1 type1, field2 type2, ...\" [-d directory]\n");
+        printf(COLOR_ERROR "❌    or:" COLOR_RESET " create <database> schema=\"field1 type1, field2 type2, ...\" [-d directory]\n");
+        printf(COLOR_INFO "💡 Example:" COLOR_RESET " create products.fxdb --schema \"id int32, name string, price float\"\n");
+        printf(COLOR_INFO "💡 Example:" COLOR_RESET " create products.fxdb schema=\"id int32, name string, price float\" -d ~/databases\n");
         return -1;
     }
 
     const char *db_name = cmd->args[1];
-
-    // Join all arguments after the database name to reconstruct the full command
-    // This handles the case where the schema contains spaces
-    char full_args[1024] = "";
+    const char *schema_str = NULL;
+    const char *directory = NULL;
+    
+    // Parse arguments looking for schema and directory options
     for (int i = 2; i < cmd->arg_count; i++)
     {
-        if (strlen(full_args) > 0)
+        const char *arg = cmd->args[i];
+        
+        // Handle --schema format (CLI style)
+        if (strcmp(arg, "--schema") == 0 && i + 1 < cmd->arg_count)
         {
-            strcat(full_args, " ");
+            schema_str = cmd->args[i + 1];
+            i++; // Skip next argument as it's the schema value
         }
-        strcat(full_args, cmd->args[i]);
+        // Handle -d or -p directory options
+        else if ((strcmp(arg, "-d") == 0 || strcmp(arg, "-p") == 0) && i + 1 < cmd->arg_count)
+        {
+            directory = cmd->args[i + 1];
+            i++; // Skip next argument as it's the directory value
+        }
+        // Handle schema= format (current shell style)
+        else if (strncmp(arg, "schema=", 7) == 0)
+        {
+            schema_str = arg + 7; // Skip "schema="
+        }
+        // Handle --directory= format
+        else if (strncmp(arg, "--directory=", 12) == 0)
+        {
+            directory = arg + 12; // Skip "--directory="
+        }
     }
 
-    // Find schema= in the full arguments
-    const char *schema_pos = strstr(full_args, "schema=");
-    if (!schema_pos)
+    if (!schema_str)
     {
-        printf("❌ Schema not specified. Use: create <database> schema=\"...\"\n");
-        printf("💡 Example: create products.fxdb schema=\"id int32, name string, price float\"\n");
+        printf(COLOR_ERROR "❌ Schema not specified. Use one of these formats:" COLOR_RESET "\n");
+        printf("   create <database> --schema \"field1 type1, field2 type2, ...\"\n");
+        printf("   create <database> schema=\"field1 type1, field2 type2, ...\"\n");
+        printf(COLOR_INFO "💡 Example:" COLOR_RESET " create products.fxdb --schema \"id int32, name string, price float\"\n");
         return -1;
     }
 
-    const char *schema_str = schema_pos + 7; // Skip "schema="
-
-    // Remove quotes from schema if present
+    // Remove quotes from schema if present (for schema= format)
     char schema_buffer[1024];
     if (schema_str[0] == '"' || schema_str[0] == '\'')
     {
@@ -640,9 +693,12 @@ static int cmd_shell_create(shell_session_t *session, const parsed_command_t *cm
         }
         schema_str = schema_buffer;
     }
+    
+    // Use directory if specified, otherwise use session working directory
+    const char *working_dir = directory ? directory : session->working_dir;
 
     // Check if database already exists
-    if (database_exists(session->working_dir, db_name))
+    if (database_exists(working_dir, db_name))
     {
         printf("❌ Database already exists: %s\n", db_name);
         printf("💡 Use 'drop %s' first to remove it (when implemented).\n", db_name);
@@ -650,34 +706,38 @@ static int cmd_shell_create(shell_session_t *session, const parsed_command_t *cm
     }
 
     // Get full path
-    char *full_path = get_database_path(session->working_dir, db_name);
+    char *full_path = get_database_path(working_dir, db_name);
     if (!full_path)
     {
         printf("❌ Failed to build database path\n");
         return -1;
     }
 
-    printf("🛠️  Creating database: %s\n", db_name);
-    printf("📋 Schema: %s\n\n", schema_str);
+    printf(COLOR_INFO "🛠️  Creating database: " COLOR_EMPHASIS "%s" COLOR_RESET "\n", db_name);
+    if (directory)
+    {
+        printf(COLOR_INFO "📁 Directory: " COLOR_RESET "%s\n", directory);
+    }
+    printf(COLOR_INFO "📋 Schema: " COLOR_RESET "%s\n\n", schema_str);
 
     schema_t *schema = parse_schema(schema_str);
     if (!schema)
     {
-        printf("❌ Failed to parse schema\n");
-        printf("💡 Check your schema format: \"field1 type1, field2 type2, ...\"\n");
-        printf("💡 Valid types: int32, float, string, bool\n");
+        printf(COLOR_ERROR "❌ Failed to parse schema" COLOR_RESET "\n");
+        printf(COLOR_INFO "💡 Check your schema format: \"field1 type1, field2 type2, ...\"" COLOR_RESET "\n");
+        printf(COLOR_INFO "💡 Valid types: int32, float, string, bool" COLOR_RESET "\n");
         free(full_path);
         return -1;
     }
 
-    printf("✅ Parsed schema:\n");
+    printf(COLOR_SUCCESS "✅ Parsed schema:" COLOR_RESET "\n");
     print_schema(schema);
     printf("\n");
 
     writer_t *writer = writer_create_default(full_path, schema);
     if (!writer)
     {
-        printf("❌ Failed to create database file\n");
+        printf(COLOR_ERROR "❌ Failed to create database file" COLOR_RESET "\n");
         free_schema(schema);
         free(full_path);
         return -1;
@@ -685,7 +745,7 @@ static int cmd_shell_create(shell_session_t *session, const parsed_command_t *cm
 
     if (writer_close(writer) != 0)
     {
-        printf("❌ Failed to finalize database file\n");
+        printf(COLOR_ERROR "❌ Failed to finalize database file" COLOR_RESET "\n");
         writer_free(writer);
         free_schema(schema);
         free(full_path);
@@ -695,7 +755,7 @@ static int cmd_shell_create(shell_session_t *session, const parsed_command_t *cm
     writer_free(writer);
     free_schema(schema);
 
-    printf("🎉 Database created successfully: %s\n", db_name);
+    printf(COLOR_SUCCESS "🎉 Database created successfully: " COLOR_EMPHASIS "%s" COLOR_RESET "\n", db_name);
 
     // Show file info
     struct stat st;
@@ -703,7 +763,7 @@ static int cmd_shell_create(shell_session_t *session, const parsed_command_t *cm
     {
         char size_str[32];
         format_file_size(st.st_size, size_str, sizeof(size_str));
-        printf("📊 File size: %s\n", size_str);
+        printf(COLOR_INFO "📊 File size: " COLOR_RESET "%s\n", size_str);
     }
 
     free(full_path);
@@ -778,33 +838,62 @@ int run_interactive_shell(const char *directory)
     shell_session_t *session = init_session(directory);
     if (!session)
     {
-        printf("❌ Failed to initialize shell session\n");
+        printf(COLOR_ERROR "❌ Failed to initialize shell session" COLOR_RESET "\n");
         return 1;
+    }
+
+    // Setup signal handlers for better Ctrl+C handling
+    setup_signal_handlers();
+
+    // Initialize readline
+    rl_readline_name = "flexondb";
+    using_history();
+    
+    // Load history from file
+    char *home = getenv("HOME");
+    char history_file[512];
+    if (home)
+    {
+        snprintf(history_file, sizeof(history_file), "%s/.flexondb_history", home);
+        read_history(history_file);
     }
 
     print_welcome_screen(session);
 
-    char line[MAX_COMMAND_LEN];
-
+    char *line;
     while (1)
     {
-        print_prompt(session);
+        // Reset interrupt flag
+        interrupt_received = 0;
+        
+        // Get line from readline with custom prompt
+        char *prompt = generate_prompt(session);
+        line = readline(prompt);
 
-        if (!fgets(line, sizeof(line), stdin))
+        // Check for EOF (Ctrl+D)
+        if (!line)
         {
-            // EOF or error
             printf("\n");
             break;
         }
 
-        // Remove newline
-        line[strcspn(line, "\n")] = 0;
+        // Handle Ctrl+C during command input
+        if (interrupt_received)
+        {
+            interrupt_received = 0;
+            free(line);
+            continue;
+        }
 
         // Skip empty lines
         if (strlen(line) == 0)
         {
+            free(line);
             continue;
         }
+
+        // Add non-empty line to history
+        add_history(line);
 
         // Parse and execute command
         parsed_command_t *cmd = parse_command(line);
@@ -816,9 +905,20 @@ int run_interactive_shell(const char *directory)
             if (result == 1)
             {
                 // Exit signal
+                free(line);
                 break;
             }
         }
+        
+        free(line);
+    }
+
+    // Save history
+    if (home)
+    {
+        write_history(history_file);
+        // Keep only last 1000 commands
+        history_truncate_file(history_file, 1000);
     }
 
     print_goodbye(session);

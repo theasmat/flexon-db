@@ -66,7 +66,7 @@ CLI_OBJS = $(BUILDDIR)/main.o
 
 # Main CLI tool
 $(BUILDDIR)/flexon: $(CLI_OBJS) $(CORE_OBJS) $(SHELL_OBJS) $(COMMON_OBJS) | $(BUILDDIR)
-	$(CC) $(CFLAGS) $^ -o $@
+	$(CC) $(CFLAGS) $^ -o $@ -lreadline
 
 # Test programs
 $(BUILDDIR)/test_schema: $(EXAMPLEDIR)/test_schema.c $(BUILDDIR)/schema.o | $(BUILDDIR)
