@@ -3,6 +3,7 @@
 #include "../../include/writer.h"
 #include "../../include/utils.h"
 #include "../../include/error.h"
+#include "../../include/core/data_types.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -26,18 +27,22 @@ static char* trim_whitespace(char* str) {
     return str;
 }
 
-// Parse field type from string
+// Parse field type from string (legacy support)
 field_type_t string_to_field_type(const char* type_str) {
-    if (strcmp(type_str, "int32") == 0) {
-        return FIELD_TYPE_INT32;
-    } else if (strcmp(type_str, "float") == 0) {
-        return FIELD_TYPE_FLOAT;
-    } else if (strcmp(type_str, "string") == 0) {
-        return FIELD_TYPE_STRING;
-    } else if (strcmp(type_str, "bool") == 0) {
-        return FIELD_TYPE_BOOL;
+    // Use enhanced parser and convert back to legacy type
+    flexon_data_type_t flexon_type = flexon_parse_type(type_str);
+    return flexon_to_legacy_type(flexon_type);
+}
+
+// Enhanced field type parsing with full type system support
+field_type_t string_to_field_type_enhanced(const char* type_str, uint32_t* size_out) {
+    flexon_data_type_t flexon_type = flexon_parse_type(type_str);
+    
+    if (size_out) {
+        *size_out = (uint32_t)flexon_type_size(flexon_type);
     }
-    return FIELD_TYPE_UNKNOWN;
+    
+    return flexon_to_legacy_type(flexon_type);
 }
 
 // Get string representation of field type
@@ -51,7 +56,7 @@ const char* field_type_to_string(field_type_t type) {
     }
 }
 
-// Get field size in bytes
+// Get field size in bytes (enhanced)
 static uint32_t get_field_size(field_type_t type) {
     switch(type) {
         case FIELD_TYPE_INT32:  return 4;
@@ -60,6 +65,12 @@ static uint32_t get_field_size(field_type_t type) {
         case FIELD_TYPE_BOOL:   return 1;
         default:                return 0;
     }
+}
+
+// Enhanced field size calculation using the new type system
+static uint32_t get_field_size_enhanced(const char* type_str) {
+    flexon_data_type_t flexon_type = flexon_parse_type(type_str);
+    return (uint32_t)flexon_type_size(flexon_type);
 }
 
 // Parse a schema string like "name string, age int32, salary float"
@@ -113,8 +124,9 @@ schema_t* parse_schema(const char* schema_str) {
             return NULL;
         }
         
-        // Parse field type
-        field_type_t type = string_to_field_type(type_str);
+        // Parse field type (enhanced)
+        uint32_t enhanced_size = 0;
+        field_type_t type = string_to_field_type_enhanced(type_str, &enhanced_size);
         if (type == FIELD_TYPE_UNKNOWN) {
             fprintf(stderr, "Error: Unknown field type '%s'\n", type_str);
             free(schema_copy);
@@ -126,7 +138,7 @@ schema_t* parse_schema(const char* schema_str) {
         field_def_t* field = &schema->fields[schema->field_count];
         strcpy(field->name, field_name);
         field->type = type;
-        field->size = get_field_size(type);
+        field->size = enhanced_size > 0 ? enhanced_size : get_field_size(type);
         
         schema->field_count++;
         token = strtok(NULL, ",");
