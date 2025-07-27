@@ -7,9 +7,68 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <signal.h>
+#include <readline/readline.h>
+#include <readline/history.h>
 
 // External logo from main.c
 extern const char *logo;
+
+// Global flag for signal handling
+static volatile int interrupt_received = 0;
+
+/**
+ * Signal handler for SIGINT (Ctrl+C)
+ */
+static void sigint_handler(int sig)
+{
+    (void)sig; // Unused parameter
+    interrupt_received = 1;
+    printf(COLOR_WARNING "\n🛑 Caught Ctrl+C! Use " COLOR_EMPHASIS "'quit'" COLOR_WARNING ", " COLOR_EMPHASIS "'exit'" COLOR_WARNING ", or " COLOR_EMPHASIS "'q'" COLOR_WARNING " to exit gracefully." COLOR_RESET "\n");
+    rl_on_new_line();
+    rl_replace_line("", 0);
+    rl_redisplay();
+}
+
+/**
+ * Setup signal handlers
+ */
+static void setup_signal_handlers(void)
+{
+    struct sigaction sa;
+    sa.sa_handler = sigint_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART;
+    sigaction(SIGINT, &sa, NULL);
+}
+
+/**
+ * Custom readline prompt generator
+ */
+static char* generate_prompt(const shell_session_t *session)
+{
+    static char prompt[256];
+    
+    if (strlen(session->current_db) > 0)
+    {
+        // Extract database name without .fxdb extension for cleaner display
+        char db_name[MAX_DATABASE_NAME_LEN];
+        strncpy(db_name, session->current_db, sizeof(db_name) - 1);
+        db_name[sizeof(db_name) - 1] = '\0';
+
+        char *ext = strstr(db_name, ".fxdb");
+        if (ext)
+            *ext = '\0';
+
+        snprintf(prompt, sizeof(prompt), COLOR_PROMPT "flexondb:" COLOR_EMPHASIS "%s" COLOR_PROMPT "> " COLOR_RESET, db_name);
+    }
+    else
+    {
+        snprintf(prompt, sizeof(prompt), COLOR_PROMPT "flexondb> " COLOR_RESET);
+    }
+    
+    return prompt;
+}
 
 /**
  * Initialize shell session
@@ -93,31 +152,6 @@ void print_welcome_screen(const shell_session_t *session)
     }
 
     printf("\n💡 Type 'help' for available commands or 'exit' to quit.\n\n");
-}
-
-/**
- * Print shell prompt based on current state
- */
-void print_prompt(const shell_session_t *session)
-{
-    if (strlen(session->current_db) > 0)
-    {
-        // Extract database name without .fxdb extension for cleaner display
-        char db_name[MAX_DATABASE_NAME_LEN];
-        strncpy(db_name, session->current_db, sizeof(db_name) - 1);
-        db_name[sizeof(db_name) - 1] = '\0';
-
-        char *ext = strstr(db_name, ".fxdb");
-        if (ext)
-            *ext = '\0';
-
-        printf(COLOR_PROMPT "flexondb:" COLOR_EMPHASIS "%s" COLOR_PROMPT "> " COLOR_RESET, db_name);
-    }
-    else
-    {
-        printf(COLOR_PROMPT "flexondb> " COLOR_RESET);
-    }
-    fflush(stdout);
 }
 
 /**
@@ -804,33 +838,62 @@ int run_interactive_shell(const char *directory)
     shell_session_t *session = init_session(directory);
     if (!session)
     {
-        printf("❌ Failed to initialize shell session\n");
+        printf(COLOR_ERROR "❌ Failed to initialize shell session" COLOR_RESET "\n");
         return 1;
+    }
+
+    // Setup signal handlers for better Ctrl+C handling
+    setup_signal_handlers();
+
+    // Initialize readline
+    rl_readline_name = "flexondb";
+    using_history();
+    
+    // Load history from file
+    char *home = getenv("HOME");
+    char history_file[512];
+    if (home)
+    {
+        snprintf(history_file, sizeof(history_file), "%s/.flexondb_history", home);
+        read_history(history_file);
     }
 
     print_welcome_screen(session);
 
-    char line[MAX_COMMAND_LEN];
-
+    char *line;
     while (1)
     {
-        print_prompt(session);
+        // Reset interrupt flag
+        interrupt_received = 0;
+        
+        // Get line from readline with custom prompt
+        char *prompt = generate_prompt(session);
+        line = readline(prompt);
 
-        if (!fgets(line, sizeof(line), stdin))
+        // Check for EOF (Ctrl+D)
+        if (!line)
         {
-            // EOF or error
             printf("\n");
             break;
         }
 
-        // Remove newline
-        line[strcspn(line, "\n")] = 0;
+        // Handle Ctrl+C during command input
+        if (interrupt_received)
+        {
+            interrupt_received = 0;
+            free(line);
+            continue;
+        }
 
         // Skip empty lines
         if (strlen(line) == 0)
         {
+            free(line);
             continue;
         }
+
+        // Add non-empty line to history
+        add_history(line);
 
         // Parse and execute command
         parsed_command_t *cmd = parse_command(line);
@@ -842,9 +905,20 @@ int run_interactive_shell(const char *directory)
             if (result == 1)
             {
                 // Exit signal
+                free(line);
                 break;
             }
         }
+        
+        free(line);
+    }
+
+    // Save history
+    if (home)
+    {
+        write_history(history_file);
+        // Keep only last 1000 commands
+        history_truncate_file(history_file, 1000);
     }
 
     print_goodbye(session);

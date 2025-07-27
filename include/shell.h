@@ -113,11 +113,6 @@ shell_session_t* init_session(const char* directory);
 void print_welcome_screen(const shell_session_t* session);
 
 /**
- * Print shell prompt based on current state
- */
-void print_prompt(const shell_session_t* session);
-
-/**
  * Execute a shell command
  */
 int execute_shell_command(shell_session_t* session, const parsed_command_t* cmd);
