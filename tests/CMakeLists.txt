@@ -36,6 +36,10 @@ if(ENABLE_TESTING)
     target_link_libraries(test_enhanced_schema flexondb_core test_utils)
     add_test(NAME enhanced_schema_tests COMMAND test_enhanced_schema)
     
+    add_executable(test_command_processor unit/test_command_processor.c)
+    target_link_libraries(test_command_processor flexondb_core flexondb_common test_utils)
+    add_test(NAME command_processor_tests COMMAND test_command_processor)
+    
     # Integration tests
     add_executable(test_cli_shell_parity integration/test_cli_shell_parity.c)
     target_link_libraries(test_cli_shell_parity flexondb_core flexondb_cli flexondb_shell test_utils)

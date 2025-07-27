@@ -5,6 +5,7 @@ set(COMMON_SOURCES
     io_utils.c
     logo.c
     welcome.c
+    command_processor.c
 )
 
 add_library(flexondb_common STATIC ${COMMON_SOURCES})
