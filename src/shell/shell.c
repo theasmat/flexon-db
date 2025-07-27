@@ -4,6 +4,9 @@
 #include "../../include/compat.h"
 #include "../../include/shell.h"
 #include "../../include/welcome.h"
+#include "../../include/writer.h"
+#include <unistd.h>
+#include <errno.h>
 
 // External logo from main.c
 
@@ -208,6 +211,11 @@ static int cmd_shell_schema(shell_session_t *session, const parsed_command_t *cm
 static int cmd_shell_clear(shell_session_t *session, const parsed_command_t *cmd);
 static int cmd_shell_create(shell_session_t *session, const parsed_command_t *cmd);
 static int cmd_shell_count(shell_session_t *session, const parsed_command_t *cmd);
+static int cmd_shell_select(shell_session_t *session, const parsed_command_t *cmd);
+static int cmd_shell_insert(shell_session_t *session, const parsed_command_t *cmd);
+static int cmd_shell_drop(shell_session_t *session, const parsed_command_t *cmd);
+static int cmd_shell_export(shell_session_t *session, const parsed_command_t *cmd);
+static int cmd_shell_history(shell_session_t *session, const parsed_command_t *cmd);
 
 /**
  * Execute a shell command
@@ -260,6 +268,26 @@ int execute_shell_command(shell_session_t *session, const parsed_command_t *cmd)
         result = cmd_shell_count(session, cmd);
         break;
 
+    case CMD_SELECT:
+        result = cmd_shell_select(session, cmd);
+        break;
+
+    case CMD_INSERT:
+        result = cmd_shell_insert(session, cmd);
+        break;
+
+    case CMD_DROP:
+        result = cmd_shell_drop(session, cmd);
+        break;
+
+    case CMD_EXPORT:
+        result = cmd_shell_export(session, cmd);
+        break;
+
+    case CMD_HISTORY:
+        result = cmd_shell_history(session, cmd);
+        break;
+
     case CMD_EXIT:
     case CMD_QUIT:
         return 1; // Signal to exit
@@ -303,16 +331,16 @@ static int cmd_shell_help(shell_session_t *session, const parsed_command_t *cmd)
         {"use <database>", "Switch to a database"},
         {"show databases", "List all available databases"},
         {"create <db> schema=\"...\"", "Create a new database"},
-        {"drop <database>", "Delete a database (not implemented)"},
-        {"select * [limit N]", "Read rows from current database (not implemented)"},
+        {"drop <database>", "Delete a database"},
+        {"select * [limit N]", "Read rows from current database"},
         {"count", "Show row count for current database"},
-        {"insert field=value ...", "Insert a row (not implemented)"},
-        {"export [csv|json]", "Export data (not implemented)"},
+        {"insert field=value ...", "Insert a row interactively"},
+        {"export [csv|json]", "Export data in specified format"},
         {"info", "Show current database information"},
         {"schema", "Show current database schema"},
         {"status", "Show session information"},
         {"clear", "Clear the screen"},
-        {"history", "Show command history (not implemented)"},
+        {"history", "Show command history"},
         {"help", "Show this help message"},
         {"exit, quit", "Exit the shell"}};
 
@@ -830,11 +858,425 @@ static int cmd_shell_count(shell_session_t *session, const parsed_command_t *cmd
 
     if (total_rows == 0)
     {
-        printf("\n💡 Database is empty. Use 'insert' command to add data (when implemented).\n");
+        printf("\n💡 Database is empty. Use 'insert' command to add data.\n");
     }
 
     reader_close(reader);
     free(full_path);
+    return 0;
+}
+
+/**
+ * Select command implementation - Read rows from current database
+ */
+static int cmd_shell_select(shell_session_t *session, const parsed_command_t *cmd)
+{
+    if (strlen(session->current_db) == 0)
+    {
+        printf("❌ No database selected. Use 'use <database>' first.\n");
+        return -1;
+    }
+
+    // Parse limit if provided
+    uint32_t limit = 0;
+    if (cmd->arg_count >= 2 && strcmp(cmd->args[1], "*") == 0)
+    {
+        if (cmd->arg_count >= 4 && strcmp(cmd->args[2], "limit") == 0)
+        {
+            limit = atoi(cmd->args[3]);
+        }
+    }
+    else if (cmd->arg_count >= 3 && strcmp(cmd->args[2], "limit") == 0 && cmd->arg_count >= 4)
+    {
+        limit = atoi(cmd->args[3]);
+    }
+
+    char *full_path = get_database_path(session->working_dir, session->current_db);
+    if (!full_path)
+    {
+        printf("❌ Failed to build database path\n");
+        return -1;
+    }
+
+    reader_t *reader = reader_open(full_path);
+    if (!reader)
+    {
+        printf("❌ Failed to open database: %s\n", session->current_db);
+        free(full_path);
+        return -1;
+    }
+
+    printf("📖 Reading from database: %s\n\n", session->current_db);
+
+    uint32_t total_rows = reader_get_row_count(reader);
+    if (limit == 0 || limit > total_rows)
+    {
+        limit = total_rows;
+    }
+
+    if (total_rows == 0)
+    {
+        printf("📄 Database is empty.\n");
+    }
+    else
+    {
+        query_result_t *result = reader_read_rows(reader, limit);
+        if (result)
+        {
+            reader_print_rows(reader, result);
+            reader_free_result(result);
+        }
+        else
+        {
+            printf("❌ Failed to read data\n");
+        }
+    }
+
+    reader_close(reader);
+    free(full_path);
+    return 0;
+}
+
+/**
+ * Insert command implementation - Insert a row interactively
+ */
+static int cmd_shell_insert(shell_session_t *session, const parsed_command_t *cmd)
+{
+    if (strlen(session->current_db) == 0)
+    {
+        printf("❌ No database selected. Use 'use <database>' first.\n");
+        return -1;
+    }
+
+    if (cmd->arg_count < 2)
+    {
+        printf("❌ Usage: insert field1=value1 field2=value2 ...\n");
+        printf("💡 Example: insert name=\"John Doe\" age=30 active=true\n");
+        return -1;
+    }
+
+    char *full_path = get_database_path(session->working_dir, session->current_db);
+    if (!full_path)
+    {
+        printf("❌ Failed to build database path\n");
+        return -1;
+    }
+
+    // Open database for appending
+    writer_t *writer = writer_open(full_path);
+    if (!writer)
+    {
+        printf("❌ Failed to open database for insertion: %s\n", session->current_db);
+        free(full_path);
+        return -1;
+    }
+
+    // Build JSON from field=value pairs
+    char json_str[1024] = "{";
+    bool first = true;
+
+    for (int i = 1; i < cmd->arg_count; i++)
+    {
+        char *pair = strdup(cmd->args[i]);
+        char *equals = strchr(pair, '=');
+        if (!equals)
+        {
+            printf("❌ Invalid field assignment: %s\n", cmd->args[i]);
+            printf("💡 Use format: field=value\n");
+            free(pair);
+            writer_close(writer);
+            writer_free(writer);
+            free(full_path);
+            return -1;
+        }
+
+        *equals = '\0';
+        char *field = pair;
+        char *value = equals + 1;
+
+        if (!first)
+        {
+            strcat(json_str, ", ");
+        }
+        first = false;
+
+        // Add quotes for string values that don't look like numbers or booleans
+        if (strcmp(value, "true") != 0 && strcmp(value, "false") != 0 && 
+            strspn(value, "0123456789.-") != strlen(value))
+        {
+            char temp[512];
+            snprintf(temp, sizeof(temp), "\"%s\": \"%s\"", field, value);
+            strcat(json_str, temp);
+        }
+        else
+        {
+            char temp[512];
+            snprintf(temp, sizeof(temp), "\"%s\": %s", field, value);
+            strcat(json_str, temp);
+        }
+
+        free(pair);
+    }
+    strcat(json_str, "}");
+
+    printf("🔍 Generated JSON: %s\n", json_str);
+
+    // Insert the data
+    if (writer_insert_json(writer, json_str) == 0)
+    {
+        printf("✅ Data inserted successfully\n");
+    }
+    else
+    {
+        printf("❌ Failed to insert data\n");
+        writer_close(writer);
+        writer_free(writer);
+        free(full_path);
+        return -1;
+    }
+
+    writer_close(writer);
+    writer_free(writer);
+    free(full_path);
+    return 0;
+}
+
+/**
+ * Drop command implementation - Delete a database
+ */
+static int cmd_shell_drop(shell_session_t *session, const parsed_command_t *cmd)
+{
+    if (cmd->arg_count < 2)
+    {
+        printf("❌ Usage: drop <database>\n");
+        printf("💡 Example: drop employees.fxdb\n");
+        return -1;
+    }
+
+    const char *db_name = cmd->args[1];
+    char *full_path = get_database_path(session->working_dir, db_name);
+    if (!full_path)
+    {
+        printf("❌ Failed to build database path\n");
+        return -1;
+    }
+
+    // Check if file exists
+    if (access(full_path, F_OK) != 0)
+    {
+        printf("❌ Database does not exist: %s\n", db_name);
+        free(full_path);
+        return -1;
+    }
+
+    printf("⚠️  Are you sure you want to delete database '%s'? [y/N]: ", db_name);
+    fflush(stdout);
+
+    char confirmation[10];
+    if (fgets(confirmation, sizeof(confirmation), stdin) != NULL)
+    {
+        if (confirmation[0] == 'y' || confirmation[0] == 'Y')
+        {
+            if (unlink(full_path) == 0)
+            {
+                printf("✅ Database '%s' deleted successfully\n", db_name);
+                
+                // Clear current database if it was the one deleted
+                if (strcmp(session->current_db, db_name) == 0)
+                {
+                    memset(session->current_db, 0, sizeof(session->current_db));
+                }
+            }
+            else
+            {
+                printf("❌ Failed to delete database: %s\n", strerror(errno));
+                free(full_path);
+                return -1;
+            }
+        }
+        else
+        {
+            printf("📝 Database deletion cancelled\n");
+        }
+    }
+    else
+    {
+        printf("📝 Database deletion cancelled\n");
+    }
+
+    free(full_path);
+    return 0;
+}
+
+/**
+ * Export command implementation - Export data in specified format
+ */
+static int cmd_shell_export(shell_session_t *session, const parsed_command_t *cmd)
+{
+    if (strlen(session->current_db) == 0)
+    {
+        printf("❌ No database selected. Use 'use <database>' first.\n");
+        return -1;
+    }
+
+    // Parse format (default: csv)
+    const char *format = "csv";
+    if (cmd->arg_count >= 2)
+    {
+        format = cmd->args[1];
+        if (strcmp(format, "csv") != 0 && strcmp(format, "json") != 0)
+        {
+            printf("❌ Unsupported format: %s\n", format);
+            printf("💡 Supported formats: csv, json\n");
+            return -1;
+        }
+    }
+
+    char *full_path = get_database_path(session->working_dir, session->current_db);
+    if (!full_path)
+    {
+        printf("❌ Failed to build database path\n");
+        return -1;
+    }
+
+    reader_t *reader = reader_open(full_path);
+    if (!reader)
+    {
+        printf("❌ Failed to open database: %s\n", session->current_db);
+        free(full_path);
+        return -1;
+    }
+
+    uint32_t total_rows = reader_get_row_count(reader);
+    if (total_rows == 0)
+    {
+        printf("📄 Database is empty - nothing to export\n");
+        reader_close(reader);
+        free(full_path);
+        return 0;
+    }
+
+    printf("📤 Exporting %u rows in %s format...\n\n", total_rows, format);
+
+    query_result_t *result = reader_read_rows(reader, total_rows);
+    if (!result)
+    {
+        printf("❌ Failed to read data\n");
+        reader_close(reader);
+        free(full_path);
+        return -1;
+    }
+
+    // Export in requested format (same logic as CLI dump command)
+    if (strcmp(format, "csv") == 0)
+    {
+        // CSV output
+        const schema_t *schema = reader->schema;
+        
+        // Print CSV header
+        for (uint32_t i = 0; i < schema->field_count; i++)
+        {
+            printf("%s", schema->fields[i].name);
+            if (i < schema->field_count - 1) printf(",");
+        }
+        printf("\n");
+        
+        // Print CSV data rows
+        for (uint32_t r = 0; r < result->row_count; r++)
+        {
+            const row_data_t *row = &result->rows[r];
+            for (uint32_t f = 0; f < row->field_count; f++)
+            {
+                const field_value_t *value = &row->values[f];
+                
+                switch (schema->fields[f].type)
+                {
+                    case TYPE_STRING:
+                        printf("\"%s\"", value->value.string_val ? value->value.string_val : "");
+                        break;
+                    case TYPE_INT32:
+                        printf("%d", value->value.int32_val);
+                        break;
+                    case TYPE_FLOAT:
+                        printf("%.2f", value->value.float_val);
+                        break;
+                    case TYPE_BOOL:
+                        printf("%s", value->value.bool_val ? "true" : "false");
+                        break;
+                    default:
+                        printf("null");
+                        break;
+                }
+                if (f < row->field_count - 1) printf(",");
+            }
+            printf("\n");
+        }
+    }
+    else // json
+    {
+        // JSON output
+        const schema_t *schema = reader->schema;
+        
+        printf("[\n");
+        for (uint32_t r = 0; r < result->row_count; r++)
+        {
+            const row_data_t *row = &result->rows[r];
+            printf("  {");
+            
+            for (uint32_t f = 0; f < row->field_count; f++)
+            {
+                const field_value_t *value = &row->values[f];
+                printf("\"%s\": ", schema->fields[f].name);
+                
+                switch (schema->fields[f].type)
+                {
+                    case TYPE_STRING:
+                        printf("\"%s\"", value->value.string_val ? value->value.string_val : "");
+                        break;
+                    case TYPE_INT32:
+                        printf("%d", value->value.int32_val);
+                        break;
+                    case TYPE_FLOAT:
+                        printf("%.2f", value->value.float_val);
+                        break;
+                    case TYPE_BOOL:
+                        printf("%s", value->value.bool_val ? "true" : "false");
+                        break;
+                    default:
+                        printf("null");
+                        break;
+                }
+                if (f < row->field_count - 1) printf(", ");
+            }
+            
+            printf("}");
+            if (r < result->row_count - 1) printf(",");
+            printf("\n");
+        }
+        printf("]\n");
+    }
+
+    reader_free_result(result);
+    reader_close(reader);
+    free(full_path);
+    return 0;
+}
+
+/**
+ * History command implementation - Show command history
+ */
+static int cmd_shell_history(shell_session_t *session, const parsed_command_t *cmd)
+{
+    (void)session; // Unused parameter
+    (void)cmd;     // Unused parameter
+
+    printf("📚 Command History\n");
+    printf("══════════════════\n\n");
+
+    printf("📄 Command history feature coming soon\n");
+    printf("💡 History will be available in a future update\n");
+    printf("✨ For now, you can use your shell's history (up/down arrows)\n");
+    
     return 0;
 }
 

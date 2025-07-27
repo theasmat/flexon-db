@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <limits.h>
 
 // Create default writer configuration
 writer_config_t writer_default_config(void) {
@@ -327,20 +328,297 @@ void writer_free(writer_t* writer) {
     }
 }
 
+// Helper function to trim whitespace
+static char* trim_whitespace(char* str) {
+    char* end;
+    
+    // Trim leading space
+    while (*str == ' ' || *str == '\t' || *str == '\n' || *str == '\r') {
+        str++;
+    }
+    
+    if (*str == 0) return str;
+    
+    // Trim trailing space
+    end = str + strlen(str) - 1;
+    while (end > str && (*end == ' ' || *end == '\t' || *end == '\n' || *end == '\r')) {
+        end--;
+    }
+    end[1] = '\0';
+    
+    return str;
+}
+
+// Helper function to parse JSON value and convert to appropriate type
+static int parse_json_value(const char* value_str, field_type_t type, field_value_t* out_value) {
+    char* trimmed = trim_whitespace((char*)value_str);
+    
+    switch (type) {
+        case TYPE_STRING: {
+            // Remove quotes if present
+            if (trimmed[0] == '"' && trimmed[strlen(trimmed) - 1] == '"') {
+                trimmed[strlen(trimmed) - 1] = '\0';
+                trimmed++;
+            }
+            out_value->value.string_val = trimmed;
+            break;
+        }
+        case TYPE_INT32: {
+            char* endptr;
+            long val = strtol(trimmed, &endptr, 10);
+            if (*endptr != '\0' || val > INT32_MAX || val < INT32_MIN) {
+                return -1;
+            }
+            out_value->value.int32_val = (int32_t)val;
+            break;
+        }
+        case TYPE_FLOAT: {
+            char* endptr;
+            float val = strtof(trimmed, &endptr);
+            if (*endptr != '\0') {
+                return -1;
+            }
+            out_value->value.float_val = val;
+            break;
+        }
+        case TYPE_BOOL: {
+            if (strcmp(trimmed, "true") == 0 || strcmp(trimmed, "1") == 0) {
+                out_value->value.bool_val = true;
+            } else if (strcmp(trimmed, "false") == 0 || strcmp(trimmed, "0") == 0) {
+                out_value->value.bool_val = false;
+            } else {
+                return -1;
+            }
+            break;
+        }
+        default:
+            return -1;
+    }
+    
+    return 0;
+}
+
 // Simple JSON parser for insert (basic implementation)
-int writer_insert_json(writer_t* writer, const char* json_str __attribute__((unused))) {
-    // TODO: Implement a simple JSON parser
-    // For now, return error
-    fprintf(stderr, "writer_insert_json: Not yet implemented\n");
-    return -1;
+int writer_insert_json(writer_t* writer, const char* json_str) {
+    if (!writer || !json_str) {
+        return -1;
+    }
+    
+    // Create a working copy of the JSON string
+    char* json_copy = malloc(strlen(json_str) + 1);
+    if (!json_copy) {
+        return -1;
+    }
+    strcpy(json_copy, json_str);
+    
+    // Trim and validate basic JSON structure
+    char* trimmed = trim_whitespace(json_copy);
+    if (trimmed[0] != '{' || trimmed[strlen(trimmed) - 1] != '}') {
+        fprintf(stderr, "Error: Invalid JSON format - must be an object {...}\n");
+        free(json_copy);
+        return -1;
+    }
+    
+    // Remove outer braces
+    trimmed[strlen(trimmed) - 1] = '\0';
+    trimmed++;
+    
+    // Prepare field values array
+    field_value_t* values = malloc(writer->schema->field_count * sizeof(field_value_t));
+    if (!values) {
+        free(json_copy);
+        return -1;
+    }
+    
+    // Initialize all fields to ensure we have values for all schema fields
+    for (uint32_t i = 0; i < writer->schema->field_count; i++) {
+        values[i].field_name = writer->schema->fields[i].name;
+        // Set default values based on type
+        switch (writer->schema->fields[i].type) {
+            case TYPE_STRING:
+                values[i].value.string_val = "";
+                break;
+            case TYPE_INT32:
+                values[i].value.int32_val = 0;
+                break;
+            case TYPE_FLOAT:
+                values[i].value.float_val = 0.0f;
+                break;
+            case TYPE_BOOL:
+                values[i].value.bool_val = false;
+                break;
+            default:
+                break;
+        }
+    }
+    
+    // Parse key-value pairs
+    char* pair = strtok(trimmed, ",");
+    while (pair != NULL) {
+        // Find the key-value separator
+        char* colon = strchr(pair, ':');
+        if (!colon) {
+            fprintf(stderr, "Error: Invalid JSON pair format\n");
+            free(values);
+            free(json_copy);
+            return -1;
+        }
+        
+        *colon = '\0';
+        char* key = trim_whitespace(pair);
+        char* value = trim_whitespace(colon + 1);
+        
+        // Remove quotes from key if present
+        if (key[0] == '"' && key[strlen(key) - 1] == '"') {
+            key[strlen(key) - 1] = '\0';
+            key++;
+        }
+        
+        // Find the field in the schema
+        int field_index = get_field_index(writer->schema, key);
+        if (field_index < 0) {
+            fprintf(stderr, "Warning: Field '%s' not found in schema, ignoring\n", key);
+        } else {
+            // Parse the value according to the field type
+            if (parse_json_value(value, writer->schema->fields[field_index].type, &values[field_index]) < 0) {
+                fprintf(stderr, "Error: Invalid value '%s' for field '%s'\n", value, key);
+                free(values);
+                free(json_copy);
+                return -1;
+            }
+        }
+        
+        pair = strtok(NULL, ",");
+    }
+    
+    // Insert the row using existing function
+    int result = writer_insert_row(writer, values, writer->schema->field_count);
+    
+    free(values);
+    free(json_copy);
+    return result;
 }
 
 // Open existing .fxdb file for appending
-writer_t* writer_open(const char* filename __attribute__((unused))) {
-    // TODO: Implement opening existing files
-    // This requires reading the header and schema first
-    fprintf(stderr, "writer_open: Not yet implemented\n");
-    return NULL;
+writer_t* writer_open(const char* filename) {
+    if (!filename) {
+        return NULL;
+    }
+    
+    // First, try to open the file for reading to validate it exists and is valid
+    FILE* read_file = fopen(filename, "rb");
+    if (!read_file) {
+        fprintf(stderr, "Error: Cannot open file '%s' for reading: %s\n", filename, strerror(errno));
+        return NULL;
+    }
+    
+    // Read and validate header
+    fxdb_header_t header;
+    if (fread(&header, sizeof(fxdb_header_t), 1, read_file) != 1) {
+        fprintf(stderr, "Error: Cannot read header from '%s'\n", filename);
+        fclose(read_file);
+        return NULL;
+    }
+    
+    // Validate magic number
+    if (header.magic != FXDB_MAGIC_NUM) {
+        fprintf(stderr, "Error: Invalid file format - not a FlexonDB file\n");
+        fclose(read_file);
+        return NULL;
+    }
+    
+    // Load schema from file
+    if (fseek(read_file, header.schema_offset, SEEK_SET) != 0) {
+        fprintf(stderr, "Error: Cannot seek to schema in '%s'\n", filename);
+        fclose(read_file);
+        return NULL;
+    }
+    
+    // Read schema metadata
+    uint32_t field_count, row_size, schema_str_len;
+    if (fread(&field_count, sizeof(uint32_t), 1, read_file) != 1 ||
+        fread(&row_size, sizeof(uint32_t), 1, read_file) != 1 ||
+        fread(&schema_str_len, sizeof(uint32_t), 1, read_file) != 1) {
+        fprintf(stderr, "Error: Cannot read schema metadata from '%s'\n", filename);
+        fclose(read_file);
+        return NULL;
+    }
+    
+    // Read schema string
+    char* schema_str = malloc(schema_str_len + 1);
+    if (!schema_str) {
+        fclose(read_file);
+        return NULL;
+    }
+    
+    if (fread(schema_str, 1, schema_str_len, read_file) != schema_str_len) {
+        fprintf(stderr, "Error: Cannot read schema string from '%s'\n", filename);
+        free(schema_str);
+        fclose(read_file);
+        return NULL;
+    }
+    schema_str[schema_str_len] = '\0';
+    
+    // Parse the schema string to create schema object
+    schema_t* schema = parse_schema(schema_str);
+    free(schema_str);
+    
+    if (!schema) {
+        fprintf(stderr, "Error: Cannot parse schema from '%s'\n", filename);
+        fclose(read_file);
+        return NULL;
+    }
+    
+    // Validate that the parsed schema matches the file metadata
+    if (schema->field_count != field_count || schema->row_size != row_size) {
+        fprintf(stderr, "Error: Schema mismatch in '%s'\n", filename);
+        free_schema(schema);
+        fclose(read_file);
+        return NULL;
+    }
+    
+    fclose(read_file);
+    
+    // Now open the file for appending
+    FILE* append_file = fopen(filename, "r+b");
+    if (!append_file) {
+        fprintf(stderr, "Error: Cannot open file '%s' for appending: %s\n", filename, strerror(errno));
+        free_schema(schema);
+        return NULL;
+    }
+    
+    // Create writer structure
+    writer_t* writer = malloc(sizeof(writer_t));
+    if (!writer) {
+        free_schema(schema);
+        fclose(append_file);
+        return NULL;
+    }
+    
+    // Initialize writer for appending
+    memset(writer, 0, sizeof(writer_t));
+    writer->file = append_file;
+    writer->schema = schema;
+    writer->config = writer_default_config();
+    writer->header = header;
+    writer->total_rows = header.total_rows;
+    writer->current_chunk = header.chunk_count;
+    
+    // Position file pointer at the end for appending
+    if (fseek(writer->file, 0, SEEK_END) != 0) {
+        fprintf(stderr, "Error: Cannot seek to end of '%s'\n", filename);
+        writer_free(writer);
+        return NULL;
+    }
+    
+    // Allocate row buffer
+    writer->row_buffer = malloc(writer->config.chunk_size * writer->schema->row_size);
+    if (!writer->row_buffer) {
+        writer_free(writer);
+        return NULL;
+    }
+    
+    return writer;
 }
 
 /* ============================================================================
