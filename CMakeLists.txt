@@ -96,6 +96,26 @@ else()
     endif()
 endif()
 
+# Development mode configuration
+if(DEV_MODE)
+    set(CMAKE_EXPORT_COMPILE_COMMANDS ON)  # For IDE integration
+    add_compile_definitions(DEBUG_MODE=1)
+    add_compile_options(-g)  # Debug symbols
+    
+    # Add sanitizers for GCC/Clang in development mode
+    if(CMAKE_C_COMPILER_ID STREQUAL "GNU" OR CMAKE_C_COMPILER_ID STREQUAL "Clang")
+        if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+            add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
+            add_link_options(-fsanitize=address)
+        endif()
+    endif()
+    
+    message(STATUS "Development mode enabled:")
+    message(STATUS "  - Compile commands export: ON")
+    message(STATUS "  - Debug symbols: ON")
+    message(STATUS "  - Sanitizers: ${CMAKE_BUILD_TYPE}")
+endif()
+
 # Include directories
 include_directories(include)
 include_directories(include/platform)
@@ -216,7 +236,13 @@ elseif(FLEXON_PLATFORM_MOBILE)
     message(STATUS "  Terminal library: linenoise or custom")
 endif()
 
-# Build options
+# Enhanced Development Mode Options
+option(DEV_MODE "Enable development mode with extra tools" OFF)
+option(ENABLE_TESTING "Build tests" ON)
+option(BUILD_BENCHMARKS "Build benchmark suite" OFF)
+option(ENABLE_SUGGESTIONS "Enable auto-suggestions feature" ON)
+
+# Legacy Build Options
 option(FLEXON_BUILD_SHELL "Build interactive shell" ON)
 option(FLEXON_BUILD_TESTS "Build test executables" ON)
 option(FLEXON_FORCE_COLORS "Force color output on all platforms" OFF)
