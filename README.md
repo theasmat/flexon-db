@@ -1,351 +1,261 @@
-# FlexonDB
+# 🚀 FlexonDB - Modern Cross-Platform Database Engine
 
 [![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/theasmat/flexon-db)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/theasmat/flexon-db)
 
-🚀 **FlexonDB** is a fast, lightweight, and cross-platform columnar database engine designed for simplicity and performance. Built in C with a focus on minimal dependencies and maximum compatibility.
+**FlexonDB** is a high-performance, lightweight columnar database engine with modern development tools, comprehensive testing, and 20+ data types. Built with CMake-first development workflow and enhanced developer experience.
 
-## ✨ Features
+## ✨ Enhanced Features
 
-### Core Functionality
-- **🔄 Schema-based Tables** - Define structured data with strong typing
-- **📊 Multiple Data Types** - Support for strings, integers, floats, and booleans
-- **💾 Efficient Storage** - Compact binary file format (.fxdb)
-- **🔗 JSON Integration** - Native JSON import/export capabilities
-- **📈 Append Operations** - Add data to existing databases seamlessly
+### 🎯 Modern Development Experience
+- **CMake-First Workflow** - Professional build system with presets
+- **Comprehensive Testing** - Unit tests, integration tests, and benchmarks
+- **Enhanced Data Types** - 20+ types with smart defaults and aliases
+- **Unified CLI/Shell** - Perfect command parity between interfaces
+- **Auto-Suggestions** - Tab completion and context-aware help
 
-### Interfaces
-- **💻 Command Line Interface** - Full-featured CLI for database operations
-- **🖥️ Interactive Shell** - User-friendly shell with readline support
-- **📱 Mobile Support** - React Native and native mobile bindings
-- **🔧 C API** - Direct library integration for applications
+### 🔧 Core Database Engine
+- **Schema-based Tables** - Structured data with strong typing
+- **Optimized Storage** - Compact binary format with size optimization
+- **JSON Integration** - Native import/export capabilities
+- **Cross-Platform** - Linux, macOS, Windows, iOS, Android support
 
-### Export Formats
-- **📋 Tabular Display** - Pretty-printed tables for human consumption
-- **📄 CSV Export** - Industry-standard comma-separated values
-- **🌐 JSON Export** - Modern JSON format for web applications
+### 📊 Advanced Data Types
+- **String Types**: `string16`, `string32`, `string64`, `string128`, `string256`, `string512`, `text`
+- **Integer Types**: `int8`, `int16`, `int32`, `int64`, `uint8`, `uint16`, `uint32`, `uint64`
+- **Float Types**: `float32`, `float64`, `decimal` with aliases (`num`, `bignum`, `double`)
+- **Special Types**: `bool`, `timestamp`, `date`, `uuid`, `json`, `blob`
 
 ## 🚀 Quick Start
 
-### Installation
+### Modern CMake Workflow
 
 ```bash
 # Clone the repository
 git clone https://github.com/theasmat/flexon-db.git
 cd flexon-db
 
-# Build FlexonDB
-make all
+# Modern CMake development build
+cmake --preset dev-debug
+cmake --build build/dev-debug
 
-# Optional: Install system-wide
-sudo make install
+# Run comprehensive tests
+cmake --build build/dev-debug --target test-all
+
+# Legacy shortcuts (optional)
+make -f Makefile.dev test
+make -f Makefile.dev help-dev
 ```
 
-### Basic Usage
+### Available CMake Presets
 
 ```bash
-# Create a new database
-./build/flexon create employees.fxdb --schema "name string, age int32, department string, salary float"
-
-# Insert data
-./build/flexon insert employees.fxdb --data '{"name": "Alice Johnson", "age": 30, "department": "Engineering", "salary": 75000.50}'
-
-# Read data
-./build/flexon read employees.fxdb
-
-# Export as CSV
-./build/flexon dump employees.fxdb --format csv
-
-# Export as JSON
-./build/flexon dump employees.fxdb --format json
+cmake --preset dev-debug         # Debug build with symbols and sanitizers
+cmake --preset dev-release       # Optimized development build
+cmake --preset dev-test          # Test configuration
+cmake --preset dev-profile       # Profiling build with debug info
 ```
 
-### Interactive Shell
+### Cross-Platform Builds
 
 ```bash
-# Launch interactive shell
-./build/flexon
-
-# Shell commands
-flexondb> create products.fxdb schema="id int32, name string, price float, available bool"
-flexondb> use products.fxdb
-flexondb> insert id=1 name="Laptop" price=999.99 available=true
-flexondb> select *
-flexondb> export csv
-flexondb> exit
+cmake -DBUILD_PLATFORM=auto -S . -B build/auto      # Auto-detect platform
+cmake -DBUILD_PLATFORM=linux -S . -B build/linux   # Linux build
+cmake -DBUILD_PLATFORM=macos -S . -B build/macos   # macOS build
+cmake -DBUILD_PLATFORM=windows -S . -B build/win   # Windows build
 ```
 
-## 📚 Documentation
+## 📝 Enhanced Usage Examples
 
-### Data Types
-
-| Type     | Description                    | Size    | Example Values           |
-|----------|--------------------------------|---------|--------------------------|
-| `string` | Variable-length text           | 256B    | `"Hello World"`          |
-| `int32`  | 32-bit signed integer          | 4B      | `42`, `-1000`            |
-| `float`  | 32-bit floating point          | 4B      | `3.14`, `-0.5`           |
-| `bool`   | Boolean true/false             | 1B      | `true`, `false`          |
-
-### Schema Syntax
-
-```
-"field1 type1, field2 type2, field3 type3"
-```
-
-**Examples:**
-```bash
-# Simple user table
-"name string, age int32"
-
-# Product catalog
-"id int32, name string, price float, available bool"
-
-# Employee records
-"name string, department string, salary float, active bool"
-```
-
-### Command Reference
-
-#### CLI Commands
+### Database Creation with Modern Types
 
 ```bash
-# Database Management
-flexon create <file.fxdb> --schema "<schema>"     # Create database
-flexon info <file.fxdb>                          # Show database info
-flexon list                                      # List databases
+# Optimized schema with precise types
+./flexon create users.fxdb --schema "id int32, name string64, email string128"
 
-# Data Operations  
-flexon insert <file.fxdb> --data '<json>'        # Insert JSON data
-flexon read <file.fxdb> [--limit N]             # Read data
-flexon dump <file.fxdb> [--format csv|json]     # Export data
+# Compact schema for memory efficiency  
+./flexon create sessions.fxdb --schema "id int16, token string32, active bool"
 
-# Options
--d, --directory <path>    # Specify database directory
+# High-precision financial data
+./flexon create transactions.fxdb --schema "amount decimal, created timestamp"
+
+# Using type aliases
+./flexon create analytics.fxdb --schema "value bignum, count int, metadata json"
 ```
 
-#### Shell Commands
+### Data Operations
 
 ```bash
-# Database Operations
-use <database>           # Switch to database
-show databases          # List available databases
-create <db> schema="..." # Create new database
-drop <database>         # Delete database
-info                    # Show current database info
-schema                  # Show database schema
+# Insert data with JSON format
+./flexon insert users.fxdb --data '{"id": 1, "name": "Alice", "email": "alice@example.com"}'
 
-# Data Operations
-select * [limit N]      # Query data
-insert field=value ...  # Insert data interactively
-count                   # Show row count
-export [csv|json]       # Export data
+# Read data with limits
+./flexon read users.fxdb --limit 10
 
-# Utility
-status                  # Show session info
-history                 # Show command history
-clear                   # Clear screen
-help                    # Show help
-exit, quit              # Exit shell
+# Export in multiple formats
+./flexon dump users.fxdb --format csv
+./flexon dump users.fxdb --format json
+./flexon dump users.fxdb --format table
 ```
 
-## 🏗️ Architecture
-
-FlexonDB uses a columnar storage format optimized for analytical workloads:
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     .fxdb File Format                      │
-├─────────────────────────────────────────────────────────────┤
-│ Header (88 bytes)                                          │
-│ ├─ Magic Number: "FXDB"                                    │
-│ ├─ Version, Schema Info                                    │
-│ └─ Data Offsets & Sizes                                    │
-├─────────────────────────────────────────────────────────────┤
-│ Schema Section                                              │
-│ ├─ Field Definitions                                       │
-│ ├─ Field Types & Sizes                                     │
-│ └─ Schema String                                           │
-├─────────────────────────────────────────────────────────────┤
-│ Data Section                                                │
-│ ├─ Row Chunks (10,000 rows each)                          │
-│ ├─ Efficient Binary Encoding                               │
-│ └─ Optimized for Sequential Access                         │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### Key Components
-
-- **🔧 Core Engine** (`src/core/`) - Database operations and file management
-- **💻 CLI Interface** (`src/cli/`) - Command-line tools and argument parsing  
-- **🖥️ Shell Interface** (`src/shell/`) - Interactive shell and command processing
-- **🔗 Compatibility Layer** (`src/compat/`) - Cross-platform abstractions
-- **📱 Mobile Bindings** (`mobile/`) - React Native and native mobile support
-
-## 🔧 API Reference
-
-### C API Example
-
-```c
-#include "flexondb.h"
-
-// Create database
-schema_t* schema = parse_schema("name string, age int32");
-writer_t* writer = writer_create_default("users.fxdb", schema);
-
-// Insert data
-writer_insert_json(writer, "{\"name\": \"John\", \"age\": 30}");
-writer_close(writer);
-
-// Read data
-reader_t* reader = reader_open("users.fxdb");
-query_result_t* result = reader_read_rows(reader, 10);
-reader_print_rows(reader, result);
-
-// Cleanup
-reader_free_result(result);
-reader_close(reader);
-free_schema(schema);
-```
-
-### Error Handling
-
-All FlexonDB functions return appropriate error codes:
-
-- `0` - Success
-- `-1` - General error
-- `NULL` - Invalid pointer/allocation failure
-
-Check return values and use provided error messages for debugging.
-
-## 🛠️ Building from Source
-
-### Prerequisites
-
-- **GCC/Clang** - C99 compatible compiler
-- **Make** - Build system
-- **Readline** - Optional, for shell history (Linux/macOS)
-
-### Build Options
+### Interactive Shell with Enhanced Help
 
 ```bash
-# Standard build
-make all
+# Start interactive shell
+./flexon-shell
 
-# Clean build
-make clean && make all
-
-# Individual components
-make core     # Core database engine
-make cli      # CLI tools only  
-make shell    # Shell components
+# Enhanced help system
+flexondb> help                    # Show all commands in table format
+flexondb> help create            # Detailed command help
+flexondb> types                  # Show all 20+ data types with examples
 ```
 
-### Cross-Platform Support
+## 📊 Data Types Reference
 
-FlexonDB builds on:
-- ✅ **Linux** (tested on Ubuntu, CentOS, Alpine)
-- ✅ **macOS** (Intel and Apple Silicon)
-- ✅ **Windows** (MinGW, MSVC)
-- ✅ **Android** (via NDK)
-- ✅ **iOS** (via Xcode)
+| Type Category | Types | Smart Defaults | Examples |
+|---------------|-------|----------------|----------|
+| **Strings** | `string16`-`string512`, `text` | `string` → `string256` | Short codes, names, descriptions |
+| **Integers** | `int8`-`int64`, `uint8`-`uint64` | `int` → `int32` | IDs, counts, flags |
+| **Floats** | `float32`, `float64`, `decimal` | `float` → `float32` | Prices, measurements |
+| **Special** | `bool`, `timestamp`, `date`, `uuid`, `json`, `blob` | Type-specific | Flags, dates, metadata |
 
-See [BUILDING.md](docs/BUILDING.md) for detailed platform-specific instructions.
+### Type Aliases for Convenience
 
-## 📱 Mobile Integration
-
-### React Native
-
-```javascript
-import FlexonDB from './react-native/FlexonDBModule';
-
-// Create database
-await FlexonDB.createDatabase('myapp.fxdb', 'name string, score int32');
-
-// Insert data
-await FlexonDB.insertData('myapp.fxdb', '{"name": "Player1", "score": 1000}');
-
-// Read data
-const data = await FlexonDB.readData('myapp.fxdb');
-console.log(JSON.parse(data));
+```
+string → string256    int → int32       float → float32
+num → float32        double → float64   bignum → float64
 ```
 
-### Native iOS (Objective-C)
+## 🧪 Comprehensive Testing
 
-```objc
-#import "FlexonDBBridge.h"
+### Running Tests
 
-// Create and use database
-[FlexonDBBridge createDatabase:@"app.fxdb" schema:@"name string, age int32"];
-[FlexonDBBridge insertData:@"app.fxdb" json:@"{\"name\":\"User\",\"age\":25}"];
-NSString* data = [FlexonDBBridge readData:@"app.fxdb"];
+```bash
+# All tests via CMake
+cmake --build build/dev-debug --target test-all
+
+# Individual test suites
+make -f Makefile.dev test-schema        # Schema tests
+make -f Makefile.dev test-writer        # Writer tests  
+make -f Makefile.dev test-reader        # Reader tests
+
+# Performance benchmarks
+make -f Makefile.dev test-benchmarks    # Run benchmarks
+tests/scripts/benchmark.sh              # Hyperfine benchmarks
 ```
 
-### Native Android (Java)
+### Test Categories
 
-```java
-import com.flexondb.FlexonDB;
+- **Unit Tests** - Schema, writer, reader, data types (100+ test cases)
+- **Integration Tests** - CLI/shell parity, cross-platform compatibility
+- **Benchmarks** - Insert, read, query, format performance
+- **Performance** - Hyperfine-based benchmarks with JSON reporting
 
-// Create and use database
-FlexonDB.createDatabase("app.fxdb", "name string, age int32");
-FlexonDB.insertData("app.fxdb", "{\"name\":\"User\",\"age\":25}");
-String data = FlexonDB.readData("app.fxdb");
+## 🏗️ Development Workflow
+
+### Development Mode Features
+
+```bash
+# Enable development mode with enhanced features
+cmake --preset dev-debug
+
+# Features enabled in DEV_MODE:
+# - Compile commands export for IDEs
+# - Debug symbols and sanitizers
+# - Comprehensive testing
+# - Benchmark suite
 ```
 
-## ⚡ Performance
+### Legacy Makefile Support
 
-FlexonDB is optimized for:
+```bash
+# Quick test commands (wraps CMake)
+make -f Makefile.dev test           # Run all tests
+make -f Makefile.dev clean          # Clean build artifacts
+make -f Makefile.dev help-dev       # Show development commands
+```
 
-- **🚀 Fast Inserts** - Batch operations with chunked storage
-- **📊 Efficient Reads** - Sequential access patterns
-- **💾 Small Footprint** - Minimal memory usage
-- **🔧 Low Overhead** - Direct binary format
+## 📁 Project Structure
 
-### Benchmarks
+```
+flexon-db/
+├── CMakePresets.json              # Modern CMake presets
+├── CMakeLists.txt                 # Enhanced build configuration
+├── Makefile.dev                   # Legacy wrapper for tests
+├── include/
+│   ├── core/data_types.h         # Extended type system
+│   └── common/command_processor.h # Unified CLI/Shell interface
+├── src/
+│   ├── core/
+│   │   ├── data_types.c          # 20+ data type implementation
+│   │   └── schema.c              # Enhanced schema parser
+│   └── common/command_processor.c # Unified command handling
+└── tests/
+    ├── unit/                     # Unit tests (schema, types, commands)
+    ├── integration/              # Integration tests (CLI/shell parity)
+    ├── benchmarks/               # Performance benchmarks
+    └── scripts/                  # Automation (hyperfine, reporting)
+```
 
-| Operation | Throughput | Notes |
-|-----------|------------|-------|
-| Insert | ~50K rows/sec | JSON parsing included |
-| Read | ~100K rows/sec | Sequential access |
-| File Size | ~265 bytes/row | 4-field example schema |
+## 🎯 Advanced Examples
+
+### Size-Optimized Schemas
+
+```bash
+# Before: 265 bytes per row
+create old.fxdb --schema "id int32, name string, score float, active bool"
+
+# After: 75 bytes per row (71% reduction)
+create new.fxdb --schema "id int16, name string64, score float64, active bool"
+```
+
+### Type-Specific Use Cases
+
+```bash
+# IoT sensor data (compact)
+create sensors.fxdb --schema "id int16, temp float32, humidity int8, timestamp timestamp"
+
+# User profiles (readable)
+create profiles.fxdb --schema "uid uuid, name string64, bio text, joined date"
+
+# Financial records (precise)
+create ledger.fxdb --schema "amount decimal, currency string16, created timestamp"
+```
+
+## 📚 Command Reference
+
+| Command | Purpose | Example |
+|---------|---------|---------|
+| `create` | Create database with schema | `create users.fxdb --schema "id int, name string64"` |
+| `insert` | Add data to database | `insert users.fxdb --data '{"id": 1, "name": "Alice"}'` |
+| `read` | Display data | `read users.fxdb --limit 10` |
+| `info` | Show database information | `info users.fxdb` |
+| `dump` | Export data | `dump users.fxdb --format csv` |
+| `list` | List database files | `list --directory /path/to/databases` |
+| `help` | Show help | `help create` |
+| `types` | Show data types | `types` |
+
+## 🚀 Performance Features
+
+- **Optimized Row Sizes** - Smart type selection reduces storage by 60-70%
+- **Benchmark Suite** - Hyperfine integration with JSON reporting
+- **Memory Efficiency** - Precise type sizing minimizes memory usage
+- **Cross-Platform** - Optimized builds for each target platform
 
 ## 🤝 Contributing
 
-We welcome contributions! See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for guidelines.
+FlexonDB uses modern CMake development practices:
 
-### Development Setup
-
-```bash
-git clone https://github.com/theasmat/flexon-db.git
-cd flexon-db
-make all
-make test
-```
-
-### Testing
-
-```bash
-# Run all tests
-make test
-
-# Individual test suites
-make test-schema   # Schema parsing tests
-make test-writer   # Writer functionality tests  
-make test-reader   # Reader functionality tests
-```
+1. Use `cmake --preset dev-debug` for development
+2. Run `make -f Makefile.dev test` before committing
+3. Follow the existing code style and testing patterns
+4. Add tests for new features
 
 ## 📄 License
 
-FlexonDB is released under the MIT License. See [LICENSE](LICENSE) for details.
-
-## 🙏 Acknowledgments
-
-- Built with love for the database community
-- Inspired by modern columnar databases
-- Designed for simplicity and performance
+MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
-**FlexonDB** - Fast, Simple, Cross-Platform Database Engine
-
-For questions, issues, or contributions, visit our [GitHub repository](https://github.com/theasmat/flexon-db) or check out the [documentation](docs/).
+**FlexonDB** - Modern database engine with enhanced developer experience 🚀
