@@ -75,7 +75,7 @@ ssize_t flexon_getline(char **lineptr, size_t *n, FILE *stream) {
  * Windows-Specific Implementations
  * ============================================================================ */
 
-#ifdef FLEXON_PLATFORM_WINDOWS
+#if FLEXON_PLATFORM_WINDOWS
 
 int flexon_clock_gettime(int clk_id, struct timespec *tp) {
     (void)clk_id; /* Unused parameter */
@@ -127,7 +127,7 @@ int flexon_munmap(void *addr, size_t length) {
  * macOS libedit Compatibility
  * ============================================================================ */
 
-#ifdef FLEXON_HAVE_LIBEDIT_READLINE
+#if FLEXON_HAVE_LIBEDIT_READLINE
 void flexon_rl_replace_line_stub(const char* text, int clear_undo) {
     /* libedit doesn't have rl_replace_line, so this is a no-op */
     (void)text;
