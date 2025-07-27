@@ -1,4 +1,17 @@
 #define _GNU_SOURCE
+
+// macOS readline compatibility
+#ifdef __APPLE__
+#define _DEFAULT_SOURCE
+// On macOS, some readline functions may need explicit declarations
+#ifndef _FUNCTION_DEF
+#define _FUNCTION_DEF
+extern void rl_replace_line(const char *, int);
+extern int rl_on_new_line(void);
+extern int rl_redisplay(void);
+#endif
+#endif
+
 #include "../../include/shell.h"
 #include "../../include/welcome.h"
 #include <stdio.h>
