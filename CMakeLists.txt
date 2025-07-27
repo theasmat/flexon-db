@@ -129,6 +129,11 @@ add_subdirectory(src/core)
 add_subdirectory(src/shell)
 add_subdirectory(src/cli)
 
+# Add tests if enabled
+if(ENABLE_TESTING)
+    add_subdirectory(tests)
+endif()
+
 # Additional targets for backward compatibility
 # Create unified core library including all dependencies
 add_library(flexondb_unified INTERFACE)
