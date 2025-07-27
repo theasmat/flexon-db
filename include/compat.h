@@ -21,7 +21,7 @@ char* flexon_strdup(const char* str);
 #endif
 
 /* getline compatibility for platforms that don't have it */
-#ifdef FLEXON_NEED_GETLINE
+#if defined(FLEXON_NEED_GETLINE)
 ssize_t flexon_getline(char **lineptr, size_t *n, FILE *stream);
 #define getline flexon_getline
 #endif
@@ -32,7 +32,7 @@ ssize_t flexon_getline(char **lineptr, size_t *n, FILE *stream);
 #endif
 
 /* strcasecmp compatibility for Windows */
-#ifdef FLEXON_PLATFORM_WINDOWS
+#if FLEXON_PLATFORM_WINDOWS
 #define strcasecmp _stricmp
 #define strncasecmp _strnicmp
 #endif
@@ -42,7 +42,7 @@ ssize_t flexon_getline(char **lineptr, size_t *n, FILE *stream);
  * ============================================================================ */
 
 /* File access mode constants */
-#ifdef FLEXON_PLATFORM_WINDOWS
+#if FLEXON_PLATFORM_WINDOWS
     #ifndef F_OK
         #define F_OK 0
         #define W_OK 2
@@ -55,7 +55,7 @@ ssize_t flexon_getline(char **lineptr, size_t *n, FILE *stream);
 #endif
 
 /* Directory operations */
-#ifdef FLEXON_PLATFORM_WINDOWS
+#if FLEXON_PLATFORM_WINDOWS
     #include <direct.h>
     #define getcwd _getcwd
     #define chdir _chdir
@@ -66,9 +66,9 @@ ssize_t flexon_getline(char **lineptr, size_t *n, FILE *stream);
  * ============================================================================ */
 
 /* Ensure timespec is available */
-#ifndef FLEXON_PLATFORM_WINDOWS
+#if !FLEXON_PLATFORM_WINDOWS
     /* For POSIX systems, this is in time.h which is included */
-    #ifdef FLEXON_HAVE_POSIX
+    #if FLEXON_HAVE_POSIX
         /* timespec should be available */
     #endif
 #else
@@ -93,12 +93,12 @@ ssize_t flexon_getline(char **lineptr, size_t *n, FILE *stream);
  * Memory Mapping Compatibility
  * ============================================================================ */
 
-#ifdef FLEXON_HAVE_POSIX
+#if FLEXON_HAVE_POSIX
     #include <sys/mman.h>
     #define FLEXON_HAVE_MMAP
 #endif
 
-#ifdef FLEXON_PLATFORM_WINDOWS
+#if FLEXON_PLATFORM_WINDOWS
     /* Windows memory mapping using CreateFileMapping */
     #define PROT_READ   1
     #define PROT_WRITE  2
@@ -168,7 +168,7 @@ ssize_t flexon_getline(char **lineptr, size_t *n, FILE *stream);
  * Signal Handling Compatibility
  * ============================================================================ */
 
-#ifdef FLEXON_HAVE_POSIX
+#if FLEXON_HAVE_POSIX
     #define FLEXON_HAVE_SIGNALS
 #elif defined(FLEXON_PLATFORM_WINDOWS)
     /* Windows has different signal handling */
@@ -218,7 +218,7 @@ static inline int flexon_safe_strcat(char* dest, size_t dest_size, const char* s
  * ============================================================================ */
 
 /* Indicate what features are available on this platform */
-#ifdef FLEXON_HAVE_POSIX
+#if FLEXON_HAVE_POSIX
     #define FLEXON_FEATURE_POSIX_IO
     #define FLEXON_FEATURE_POSIX_SIGNALS
 #endif
@@ -244,11 +244,11 @@ static inline int flexon_safe_strcat(char* dest, size_t dest_size, const char* s
 char* flexon_strdup(const char* str);
 #endif
 
-#ifdef FLEXON_NEED_GETLINE
+#if defined(FLEXON_NEED_GETLINE)
 ssize_t flexon_getline(char **lineptr, size_t *n, FILE *stream);
 #endif
 
-#ifdef FLEXON_PLATFORM_WINDOWS
+#if FLEXON_PLATFORM_WINDOWS
 int flexon_clock_gettime(int clk_id, struct timespec *tp);
 void* flexon_mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
 int flexon_munmap(void *addr, size_t length);

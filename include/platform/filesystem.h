@@ -1,7 +1,7 @@
 #ifndef PLATFORM_FILESYSTEM_H
 #define PLATFORM_FILESYSTEM_H
 
-#include "platform.h"
+#include "../platform.h"
 #include <stdio.h>
 
 /* Filesystem abstraction layer */

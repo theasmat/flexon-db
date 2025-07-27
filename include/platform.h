@@ -33,28 +33,68 @@
 
 /* Operating System Detection */
 #if defined(_WIN32) || defined(_WIN64)
-    #define FLEXON_PLATFORM_WINDOWS
+    #define FLEXON_PLATFORM_WINDOWS 1
     #if defined(_WIN64)
-        #define FLEXON_PLATFORM_WIN64
+        #define FLEXON_PLATFORM_WIN64 1
+        #define FLEXON_PLATFORM_WIN32 0
     #else
-        #define FLEXON_PLATFORM_WIN32
+        #define FLEXON_PLATFORM_WIN32 1
+        #define FLEXON_PLATFORM_WIN64 0
     #endif
 #elif defined(__APPLE__)
     #include <TargetConditionals.h>
-    #define FLEXON_PLATFORM_APPLE
+    #define FLEXON_PLATFORM_APPLE 1
     #if TARGET_OS_IPHONE || TARGET_IPHONE_SIMULATOR
-        #define FLEXON_PLATFORM_IOS
+        #define FLEXON_PLATFORM_IOS 1
+        #define FLEXON_PLATFORM_MACOS 0
     #else
-        #define FLEXON_PLATFORM_MACOS
+        #define FLEXON_PLATFORM_MACOS 1
+        #define FLEXON_PLATFORM_IOS 0
     #endif
 #elif defined(__ANDROID__)
-    #define FLEXON_PLATFORM_ANDROID
-    #define FLEXON_PLATFORM_LINUX_BASED
+    #define FLEXON_PLATFORM_ANDROID 1
+    #define FLEXON_PLATFORM_LINUX_BASED 1
+    #define FLEXON_PLATFORM_LINUX 0
 #elif defined(__linux__)
-    #define FLEXON_PLATFORM_LINUX
-    #define FLEXON_PLATFORM_LINUX_BASED
+    #define FLEXON_PLATFORM_LINUX 1
+    #define FLEXON_PLATFORM_LINUX_BASED 1
+    #define FLEXON_PLATFORM_ANDROID 0
 #elif defined(__unix__) || defined(__unix)
-    #define FLEXON_PLATFORM_UNIX
+    #define FLEXON_PLATFORM_UNIX 1
+    #define FLEXON_PLATFORM_LINUX 0
+#endif
+
+/* Set default values for undefined platforms */
+#ifndef FLEXON_PLATFORM_WINDOWS
+#define FLEXON_PLATFORM_WINDOWS 0
+#endif
+#ifndef FLEXON_PLATFORM_APPLE
+#define FLEXON_PLATFORM_APPLE 0
+#endif
+#ifndef FLEXON_PLATFORM_MACOS
+#define FLEXON_PLATFORM_MACOS 0
+#endif
+#ifndef FLEXON_PLATFORM_IOS
+#define FLEXON_PLATFORM_IOS 0
+#endif
+#ifndef FLEXON_PLATFORM_ANDROID
+#define FLEXON_PLATFORM_ANDROID 0
+#endif
+#ifndef FLEXON_PLATFORM_LINUX
+#define FLEXON_PLATFORM_LINUX 0
+#endif
+#ifndef FLEXON_PLATFORM_UNIX
+#define FLEXON_PLATFORM_UNIX 0
+#endif
+#ifndef FLEXON_PLATFORM_LINUX_BASED
+#define FLEXON_PLATFORM_LINUX_BASED 0
+#endif
+
+/* Mobile platform detection */
+#if FLEXON_PLATFORM_IOS || FLEXON_PLATFORM_ANDROID
+    #define FLEXON_PLATFORM_MOBILE 1
+#else
+    #define FLEXON_PLATFORM_MOBILE 0
 #endif
 
 /* Compiler Detection */
@@ -73,27 +113,26 @@
  * ============================================================================ */
 
 /* POSIX Support */
-#if defined(FLEXON_PLATFORM_LINUX) || defined(FLEXON_PLATFORM_MACOS) || \
-    defined(FLEXON_PLATFORM_ANDROID) || defined(FLEXON_PLATFORM_UNIX)
-    #define FLEXON_HAVE_POSIX
+#if FLEXON_PLATFORM_LINUX || FLEXON_PLATFORM_MACOS || \
+    FLEXON_PLATFORM_ANDROID || FLEXON_PLATFORM_UNIX
+    #define FLEXON_HAVE_POSIX 1
+#else
+    #define FLEXON_HAVE_POSIX 0
 #endif
 
-/* Readline Support Detection */
-#if defined(FLEXON_PLATFORM_LINUX) || defined(FLEXON_PLATFORM_UNIX)
-    #define FLEXON_HAVE_GNU_READLINE
-#elif defined(FLEXON_PLATFORM_MACOS)
-    #define FLEXON_HAVE_LIBEDIT_READLINE
+/* Readline Support Detection - Set by build system */
+#ifndef FLEXON_HAVE_GNU_READLINE
+    #define FLEXON_HAVE_GNU_READLINE 0
 #endif
-
-/* Mobile Platform Detection */
-#if defined(FLEXON_PLATFORM_ANDROID) || defined(FLEXON_PLATFORM_IOS)
-    #define FLEXON_PLATFORM_MOBILE
+#ifndef FLEXON_HAVE_LIBEDIT_READLINE
+    #define FLEXON_HAVE_LIBEDIT_READLINE 0
 #endif
 
 /* Desktop Platform Detection */
-#if defined(FLEXON_PLATFORM_LINUX) || defined(FLEXON_PLATFORM_MACOS) || \
-    defined(FLEXON_PLATFORM_WINDOWS)
-    #define FLEXON_PLATFORM_DESKTOP
+#if FLEXON_PLATFORM_LINUX || FLEXON_PLATFORM_MACOS || FLEXON_PLATFORM_WINDOWS
+    #define FLEXON_PLATFORM_DESKTOP 1
+#else
+    #define FLEXON_PLATFORM_DESKTOP 0
 #endif
 
 /* ============================================================================
@@ -108,14 +147,14 @@
 #include <stdbool.h>
 
 /* Platform-specific includes */
-#ifdef FLEXON_PLATFORM_WINDOWS
+#if FLEXON_PLATFORM_WINDOWS
     #include <windows.h>
     #include <io.h>
     #include <direct.h>
     #include <process.h>
 #endif
 
-#ifdef FLEXON_HAVE_POSIX
+#if FLEXON_HAVE_POSIX
     #include <unistd.h>
     #include <sys/stat.h>
     #include <sys/types.h>
@@ -124,11 +163,11 @@
     #include <time.h>
 #endif
 
-#ifdef FLEXON_PLATFORM_ANDROID
+#if FLEXON_PLATFORM_ANDROID
     #include <android/log.h>
 #endif
 
-#ifdef FLEXON_PLATFORM_IOS
+#if FLEXON_PLATFORM_IOS
     #include <os/log.h>
 #endif
 
@@ -136,11 +175,11 @@
  * Cross-Platform Logging Macros
  * ============================================================================ */
 
-#ifdef FLEXON_PLATFORM_ANDROID
+#if FLEXON_PLATFORM_ANDROID
     #define FLEXON_LOG(...) __android_log_print(ANDROID_LOG_INFO, "FlexonDB", __VA_ARGS__)
     #define FLEXON_LOG_ERROR(...) __android_log_print(ANDROID_LOG_ERROR, "FlexonDB", __VA_ARGS__)
     #define FLEXON_LOG_DEBUG(...) __android_log_print(ANDROID_LOG_DEBUG, "FlexonDB", __VA_ARGS__)
-#elif defined(FLEXON_PLATFORM_IOS)
+#elif FLEXON_PLATFORM_IOS
     #define FLEXON_LOG(...) os_log(OS_LOG_DEFAULT, __VA_ARGS__)
     #define FLEXON_LOG_ERROR(...) os_log_error(OS_LOG_DEFAULT, __VA_ARGS__)
     #define FLEXON_LOG_DEBUG(...) os_log_debug(OS_LOG_DEFAULT, __VA_ARGS__)
@@ -164,7 +203,7 @@
  * File Path Separators
  * ============================================================================ */
 
-#ifdef FLEXON_PLATFORM_WINDOWS
+#if FLEXON_PLATFORM_WINDOWS
     #define FLEXON_PATH_SEPARATOR '\\'
     #define FLEXON_PATH_SEPARATOR_STR "\\"
     #define FLEXON_PATH_LIST_SEPARATOR ';'
@@ -194,12 +233,12 @@
  * Memory and String Function Availability
  * ============================================================================ */
 
-#ifdef FLEXON_PLATFORM_WINDOWS
+#if FLEXON_PLATFORM_WINDOWS
     #define FLEXON_NEED_STRDUP
     #define FLEXON_NEED_GETLINE
 #endif
 
-#ifdef FLEXON_PLATFORM_MOBILE
+#if FLEXON_PLATFORM_MOBILE
     #define FLEXON_MINIMAL_LIBC
 #endif
 

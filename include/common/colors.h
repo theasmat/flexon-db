@@ -1,7 +1,7 @@
 #ifndef COMMON_COLORS_H
 #define COMMON_COLORS_H
 
-#include "platform/platform.h"
+#include "../platform.h"
 
 /* ANSI Color Support with Platform Detection */
 

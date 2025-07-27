@@ -5,6 +5,7 @@
 #include "../../include/shell.h"
 #include "../../include/welcome.h"
 #include "../../include/writer.h"
+#include "platform/terminal.h"
 #include <unistd.h>
 #include <errno.h>
 
@@ -26,9 +27,9 @@ static void sigint_handler(int sig)
 
     printf(COLOR_WARNING "\n🛑 Caught Ctrl+C! Use " COLOR_EMPHASIS "'quit'" COLOR_WARNING ", " COLOR_EMPHASIS "'exit'" COLOR_WARNING ", or " COLOR_EMPHASIS "'q'" COLOR_WARNING " to exit gracefully." COLOR_RESET "\n");
 
-    rl_on_new_line();
-    rl_replace_line("", 0); 
-    rl_redisplay();
+    // Use platform abstraction - these calls will be no-ops if not supported
+    // We can't easily abstract rl_on_new_line() etc, so we'll skip them for now
+    // The signal handler will just print the message
 }
 
 /**
@@ -1295,9 +1296,14 @@ int run_interactive_shell(const char *directory)
     // Setup signal handlers for better Ctrl+C handling
     setup_signal_handlers();
 
-    // Initialize readline
-    rl_readline_name = "flexondb";
-    using_history();
+    // Initialize terminal subsystem
+    if (flexon_terminal_init() != 0) {
+        printf(COLOR_WARNING "⚠️  Warning: Terminal initialization failed, using fallback input" COLOR_RESET "\n");
+    }
+
+    // Enable history
+    flexon_set_history_enabled(1);
+    flexon_set_history_size(1000);
     
     // Load history from file
     char *home = getenv("HOME");
@@ -1305,7 +1311,7 @@ int run_interactive_shell(const char *directory)
     if (home)
     {
         snprintf(history_file, sizeof(history_file), "%s/.flexondb_history", home);
-        read_history(history_file);
+        flexon_load_history(history_file);
     }
 
     print_welcome_screen(session);
@@ -1316,9 +1322,9 @@ int run_interactive_shell(const char *directory)
         // Reset interrupt flag
         interrupt_received = 0;
         
-        // Get line from readline with custom prompt
+        // Get line from terminal with custom prompt
         char *prompt = generate_prompt(session);
-        line = readline(prompt);
+        line = flexon_readline(prompt);
 
         // Check for EOF (Ctrl+D)
         if (!line)
@@ -1343,7 +1349,7 @@ int run_interactive_shell(const char *directory)
         }
 
         // Add non-empty line to history
-        add_history(line);
+        flexon_add_history(line);
 
         // Parse and execute command
         parsed_command_t *cmd = parse_command(line);
@@ -1366,10 +1372,11 @@ int run_interactive_shell(const char *directory)
     // Save history
     if (home)
     {
-        write_history(history_file);
-        // Keep only last 1000 commands
-        history_truncate_file(history_file, 1000);
+        flexon_save_history(history_file);
     }
+
+    // Cleanup terminal subsystem
+    flexon_terminal_cleanup();
 
     print_goodbye(session);
     free_session(session);

@@ -1,32 +1,23 @@
 #ifndef PLATFORM_TERMINAL_H
 #define PLATFORM_TERMINAL_H
 
-#include "platform.h"
+#include "../platform.h"
 
 /* Terminal/Readline abstraction layer */
 
 /* Platform-specific includes */
-#if FLEXON_PLATFORM_MACOS
-    /* macOS uses libedit by default */
-    #ifdef FLEXON_HAVE_LIBEDIT_READLINE
-        #include <editline/readline.h>
-        #define FLEXON_HAS_READLINE 1
-        #define FLEXON_HAS_LIBEDIT 1
-    #endif
-#elif FLEXON_PLATFORM_LINUX
-    /* Linux uses GNU readline if available */
-    #ifdef FLEXON_HAVE_GNU_READLINE
-        #include <readline/readline.h>
-        #include <readline/history.h>
-        #define FLEXON_HAS_READLINE 1
-        #define FLEXON_HAS_GNU_READLINE 1
-    #endif
-#elif FLEXON_PLATFORM_WINDOWS || FLEXON_PLATFORM_MOBILE
-    /* Windows and mobile use linenoise or fallback */
-    #ifdef FLEXON_HAS_LINENOISE
-        #include "linenoise.h"
-        #define FLEXON_HAS_LINENOISE 1
-    #endif
+#if FLEXON_PLATFORM_MACOS && FLEXON_HAVE_LIBEDIT_READLINE
+    #include <editline/readline.h>
+    #define FLEXON_HAS_READLINE 1
+    #define FLEXON_HAS_LIBEDIT 1
+#elif FLEXON_PLATFORM_LINUX && FLEXON_HAVE_GNU_READLINE
+    #include <readline/readline.h>
+    #include <readline/history.h>
+    #define FLEXON_HAS_READLINE 1
+    #define FLEXON_HAS_GNU_READLINE 1
+#elif (FLEXON_PLATFORM_WINDOWS || FLEXON_PLATFORM_MOBILE) && defined(FLEXON_HAS_LINENOISE)
+    #include "linenoise.h"
+    #define FLEXON_HAS_LINENOISE 1
 #endif
 
 /* Fallback definitions */
