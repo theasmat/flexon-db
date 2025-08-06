@@ -4,22 +4,23 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/theasmat/flexon-db)
 
-**FlexonDB** is a high-performance, lightweight columnar database engine with modern development tools, comprehensive testing, and 20+ data types. Built with CMake-first development workflow and enhanced developer experience.
+**FlexonDB** is a high-performance, lightweight columnar database engine with modern cross-platform development tools, comprehensive testing, and 20+ data types. Built with CMake-first development workflow and enhanced developer experience across Linux, macOS, Windows, Android, and iOS.
 
 ## ✨ Enhanced Features
 
-### 🎯 Modern Development Experience
-- **CMake-First Workflow** - Professional build system with presets
-- **Comprehensive Testing** - Unit tests, integration tests, and benchmarks
-- **Enhanced Data Types** - 20+ types with smart defaults and aliases
-- **Unified CLI/Shell** - Perfect command parity between interfaces
-- **Auto-Suggestions** - Tab completion and context-aware help
+### 🎯 Modern Cross-Platform Development
+- **CMake-Based Build System** - Professional cross-platform builds with presets
+- **Multi-Platform Support** - Linux, macOS, Windows, Android, iOS native builds
+- **Cross-Compilation Ready** - Android NDK and iOS toolchain support
+- **Platform Abstractions** - Clean terminal/readline integration per platform
+- **Automated Build Scripts** - One-command builds for all platforms
 
 ### 🔧 Core Database Engine
 - **Schema-based Tables** - Structured data with strong typing
 - **Optimized Storage** - Compact binary format with size optimization
 - **JSON Integration** - Native import/export capabilities
-- **Cross-Platform** - Linux, macOS, Windows, iOS, Android support
+- **Enhanced Data Types** - 20+ types with smart defaults and aliases
+- **Cross-Platform CLI** - Unified command interface across all platforms
 
 ### 📊 Advanced Data Types
 - **String Types**: `string16`, `string32`, `string64`, `string128`, `string256`, `string512`, `text`
@@ -29,228 +30,309 @@
 
 ## 🚀 Quick Start
 
-### Modern CMake Workflow
+### Platform Requirements
+
+| Platform | Requirements | Terminal Support |
+|----------|-------------|------------------|
+| **Linux** | GCC/Clang, CMake 3.10+ | GNU Readline |
+| **macOS** | Xcode CLI Tools, CMake 3.10+ | libedit (built-in) |
+| **Windows** | MSVC/MinGW, CMake 3.10+ | Linenoise/fallback |
+| **Android** | Android NDK r21+, CMake 3.10+ | Linenoise |
+| **iOS** | Xcode 12+, iOS 12.0+ | Linenoise |
+
+### One-Command Build (All Platforms)
 
 ```bash
-# Clone the repository
+# Clone and build for your platform
 git clone https://github.com/theasmat/flexon-db.git
 cd flexon-db
 
-# Modern CMake development build
+# Build for current platform
+./scripts/build_all.sh
+
+# Build for multiple platforms
+./scripts/build_all.sh linux macos windows
+
+# Build with cross-compilation (requires toolchains)
+./scripts/build_all.sh android ios
+
+# Clean build for all available platforms
+./scripts/build_all.sh --clean all
+```
+
+### Platform-Specific Builds
+
+#### Linux/macOS/Windows
+```bash
+# Modern CMake workflow
+mkdir -p build/linux
+cd build/linux
+cmake -DCMAKE_BUILD_TYPE=Release ../..
+cmake --build . --parallel
+
+# Output: dist/linux/bin/flexon
+```
+
+#### Android (Cross-Compilation)
+```bash
+# Requires Android NDK
+export ANDROID_NDK=/path/to/android-ndk
+
+mkdir -p build/android
+cd build/android
+cmake -DCMAKE_TOOLCHAIN_FILE=../../toolchains/android.cmake \
+      -DCMAKE_BUILD_TYPE=Release ../..
+cmake --build . --parallel
+
+# Output: dist/android/bin/flexon (ARM64)
+```
+
+#### iOS (Cross-Compilation, macOS only)
+```bash
+# Requires Xcode
+mkdir -p build/ios
+cd build/ios
+cmake -DCMAKE_TOOLCHAIN_FILE=../../toolchains/ios.cmake \
+      -DCMAKE_BUILD_TYPE=Release ../..
+cmake --build . --parallel
+
+# Output: dist/ios/bin/flexon (ARM64)
+```
+
+### CMake Presets (Advanced)
+
+```bash
+# Debug build with sanitizers
 cmake --preset dev-debug
 cmake --build build/dev-debug
 
-# Run comprehensive tests
-cmake --build build/dev-debug --target test-all
+# Release build optimized
+cmake --preset dev-release
+cmake --build build/dev-release
 
-# Legacy shortcuts (optional)
-make -f Makefile.dev test
-make -f Makefile.dev help-dev
+# Cross-platform auto-detection
+cmake -DBUILD_PLATFORM=auto -S . -B build/auto
 ```
 
-### Available CMake Presets
+## 📦 Installation
+
+### Automated Installation
+
+#### Linux/macOS
+```bash
+# System-wide installation (requires sudo)
+./scripts/install.sh
+
+# User installation (no sudo required)
+./scripts/install.sh -d $HOME/bin
+
+# Install with libraries and headers
+./scripts/install.sh -l
+```
+
+#### Windows
+```powershell
+# System-wide installation (requires Administrator)
+.\scripts\install.ps1
+
+# User installation (no admin required)
+.\scripts\install.ps1 -UserInstall
+
+# Install with libraries
+.\scripts\install.ps1 -LibraryInstall
+```
+
+### Manual Installation
 
 ```bash
-cmake --preset dev-debug         # Debug build with symbols and sanitizers
-cmake --preset dev-release       # Optimized development build
-cmake --preset dev-test          # Test configuration
-cmake --preset dev-profile       # Profiling build with debug info
+# Copy binaries from dist/{platform}/bin/
+cp dist/linux/bin/flexon /usr/local/bin/
+cp dist/macos/bin/flexon /usr/local/bin/   # macOS
+cp dist/windows/bin/flexon.exe C:\Program Files\FlexonDB\  # Windows
 ```
 
-### Cross-Platform Builds
-
-```bash
-cmake -DBUILD_PLATFORM=auto -S . -B build/auto      # Auto-detect platform
-cmake -DBUILD_PLATFORM=linux -S . -B build/linux   # Linux build
-cmake -DBUILD_PLATFORM=macos -S . -B build/macos   # macOS build
-cmake -DBUILD_PLATFORM=windows -S . -B build/win   # Windows build
-```
-
-## 📝 Enhanced Usage Examples
+## 📝 Cross-Platform Usage
 
 ### Database Creation with Modern Types
 
 ```bash
 # Optimized schema with precise types
-./flexon create users.fxdb --schema "id int32, name string64, email string128"
+flexon create users.fxdb --schema "id int32, name string64, email string128"
 
-# Compact schema for memory efficiency  
-./flexon create sessions.fxdb --schema "id int16, token string32, active bool"
+# Compact schema for IoT/mobile (71% size reduction)
+flexon create sensors.fxdb --schema "id int16, temp float32, humidity int8, timestamp timestamp"
 
 # High-precision financial data
-./flexon create transactions.fxdb --schema "amount decimal, created timestamp"
+flexon create ledger.fxdb --schema "amount decimal, currency string16, created timestamp"
 
-# Using type aliases
-./flexon create analytics.fxdb --schema "value bignum, count int, metadata json"
+# Using type aliases for convenience
+flexon create analytics.fxdb --schema "value bignum, count int, metadata json"
 ```
 
-### Data Operations
+### Data Operations (Cross-Platform)
 
 ```bash
 # Insert data with JSON format
-./flexon insert users.fxdb --data '{"id": 1, "name": "Alice", "email": "alice@example.com"}'
+flexon insert users.fxdb --data '{"id": 1, "name": "Alice", "email": "alice@example.com"}'
 
 # Read data with limits
-./flexon read users.fxdb --limit 10
+flexon read users.fxdb --limit 10
 
 # Export in multiple formats
-./flexon dump users.fxdb --format csv
-./flexon dump users.fxdb --format json
-./flexon dump users.fxdb --format table
+flexon dump users.fxdb --format csv
+flexon dump users.fxdb --format json
+flexon dump users.fxdb --format table
 ```
 
-### Interactive Shell with Enhanced Help
+### Interactive Shell (Platform-Adaptive)
 
 ```bash
-# Start interactive shell
-./flexon-shell
+# Start interactive shell with platform-specific terminal support
+flexon-shell    # Uses GNU readline (Linux), libedit (macOS), or linenoise (Windows/mobile)
 
 # Enhanced help system
-flexondb> help                    # Show all commands in table format
-flexondb> help create            # Detailed command help
-flexondb> types                  # Show all 20+ data types with examples
+flexondb> help                    # Show all commands
+flexondb> help create             # Detailed command help
+flexondb> types                   # Show all 20+ data types
 ```
 
-## 📊 Data Types Reference
+## 🏗️ Development & Building
 
-| Type Category | Types | Smart Defaults | Examples |
-|---------------|-------|----------------|----------|
-| **Strings** | `string16`-`string512`, `text` | `string` → `string256` | Short codes, names, descriptions |
-| **Integers** | `int8`-`int64`, `uint8`-`uint64` | `int` → `int32` | IDs, counts, flags |
-| **Floats** | `float32`, `float64`, `decimal` | `float` → `float32` | Prices, measurements |
-| **Special** | `bool`, `timestamp`, `date`, `uuid`, `json`, `blob` | Type-specific | Flags, dates, metadata |
-
-### Type Aliases for Convenience
-
-```
-string → string256    int → int32       float → float32
-num → float32        double → float64   bignum → float64
-```
-
-## 🧪 Comprehensive Testing
-
-### Running Tests
-
-```bash
-# All tests via CMake
-cmake --build build/dev-debug --target test-all
-
-# Individual test suites
-make -f Makefile.dev test-schema        # Schema tests
-make -f Makefile.dev test-writer        # Writer tests  
-make -f Makefile.dev test-reader        # Reader tests
-
-# Performance benchmarks
-make -f Makefile.dev test-benchmarks    # Run benchmarks
-tests/scripts/benchmark.sh              # Hyperfine benchmarks
-```
-
-### Test Categories
-
-- **Unit Tests** - Schema, writer, reader, data types (100+ test cases)
-- **Integration Tests** - CLI/shell parity, cross-platform compatibility
-- **Benchmarks** - Insert, read, query, format performance
-- **Performance** - Hyperfine-based benchmarks with JSON reporting
-
-## 🏗️ Development Workflow
-
-### Development Mode Features
-
-```bash
-# Enable development mode with enhanced features
-cmake --preset dev-debug
-
-# Features enabled in DEV_MODE:
-# - Compile commands export for IDEs
-# - Debug symbols and sanitizers
-# - Comprehensive testing
-# - Benchmark suite
-```
-
-### Legacy Makefile Support
-
-```bash
-# Quick test commands (wraps CMake)
-make -f Makefile.dev test           # Run all tests
-make -f Makefile.dev clean          # Clean build artifacts
-make -f Makefile.dev help-dev       # Show development commands
-```
-
-## 📁 Project Structure
+### Build System Architecture
 
 ```
 flexon-db/
-├── CMakePresets.json              # Modern CMake presets
-├── CMakeLists.txt                 # Enhanced build configuration
-├── Makefile.dev                   # Legacy wrapper for tests
-├── include/
-│   ├── core/data_types.h         # Extended type system
-│   └── common/command_processor.h # Unified CLI/Shell interface
+├── CMakeLists.txt                 # Root build configuration
+├── CMakePresets.json             # Development presets
 ├── src/
-│   ├── core/
-│   │   ├── data_types.c          # 20+ data type implementation
-│   │   └── schema.c              # Enhanced schema parser
-│   └── common/command_processor.c # Unified command handling
-└── tests/
-    ├── unit/                     # Unit tests (schema, types, commands)
-    ├── integration/              # Integration tests (CLI/shell parity)
-    ├── benchmarks/               # Performance benchmarks
-    └── scripts/                  # Automation (hyperfine, reporting)
+│   ├── core/CMakeLists.txt       # Core database engine
+│   ├── shell/CMakeLists.txt      # Interactive shell
+│   ├── cli/CMakeLists.txt        # Command-line interface
+│   ├── common/CMakeLists.txt     # Shared utilities
+│   ├── platform/CMakeLists.txt  # Platform abstractions
+│   └── compat/CMakeLists.txt     # Compatibility layer
+├── toolchains/
+│   ├── android.cmake             # Android NDK toolchain
+│   └── ios.cmake                 # iOS Xcode toolchain
+└── scripts/
+    ├── build_all.sh              # Cross-platform build automation
+    ├── install.sh                # Linux/macOS installation
+    └── install.ps1               # Windows installation
 ```
 
-## 🎯 Advanced Examples
+### Platform Detection & Abstraction
+
+The build system automatically detects platforms and configures appropriate:
+- **Terminal Libraries**: GNU readline (Linux), libedit (macOS), linenoise (Windows/mobile)
+- **ANSI Color Support**: Full ANSI colors on Unix, Windows 10+ ANSI, fallback stubs
+- **File System APIs**: POSIX APIs on Unix, Win32 APIs on Windows
+- **Cross-Compilation**: Android NDK and iOS toolchain integration
+
+### Build Options
+
+```bash
+# Development features
+cmake -DDEV_MODE=ON              # Enable debug symbols, sanitizers, compile_commands.json
+cmake -DENABLE_TESTING=ON        # Build test suite
+cmake -DBUILD_BENCHMARKS=ON      # Build performance benchmarks
+
+# Platform options
+cmake -DFLEXON_FORCE_COLORS=ON   # Force color output
+cmake -DFLEXON_BUILD_SHELL=OFF   # Disable shell (mobile builds)
+
+# Cross-compilation
+cmake -DCMAKE_TOOLCHAIN_FILE=toolchains/android.cmake  # Android
+cmake -DCMAKE_TOOLCHAIN_FILE=toolchains/ios.cmake      # iOS
+```
+
+## 🧪 Testing & Validation
+
+### Comprehensive Test Suite
+
+```bash
+# Run all tests
+cmake --build build --target test-all
+
+# Individual test categories
+cmake --build build --target test-schema     # Schema validation
+cmake --build build --target test-writer     # Write operations
+cmake --build build --target test-reader     # Read operations
+
+# Cross-platform validation
+./scripts/build_all.sh --clean all           # Build all platforms
+```
+
+### Platform Validation
+
+| Platform | Status | Features |
+|----------|--------|----------|
+| **Linux** | ✅ Fully Tested | GNU readline, ANSI colors, full feature set |
+| **macOS** | ✅ Fully Tested | libedit, ANSI colors, full feature set |
+| **Windows** | ✅ Ready to Test | Linenoise, Windows 10+ ANSI, full feature set |
+| **Android** | ✅ Ready to Test | Linenoise, mobile optimizations |
+| **iOS** | ✅ Ready to Test | Linenoise, mobile optimizations |
+
+## 📊 Performance & Optimization
 
 ### Size-Optimized Schemas
 
 ```bash
-# Before: 265 bytes per row
+# Before: Generic types (265 bytes per row)
 create old.fxdb --schema "id int32, name string, score float, active bool"
 
-# After: 75 bytes per row (71% reduction)
+# After: Precise types (75 bytes per row - 71% reduction)
 create new.fxdb --schema "id int16, name string64, score float64, active bool"
 ```
 
-### Type-Specific Use Cases
+### Platform-Specific Optimizations
 
-```bash
-# IoT sensor data (compact)
-create sensors.fxdb --schema "id int16, temp float32, humidity int8, timestamp timestamp"
-
-# User profiles (readable)
-create profiles.fxdb --schema "uid uuid, name string64, bio text, joined date"
-
-# Financial records (precise)
-create ledger.fxdb --schema "amount decimal, currency string16, created timestamp"
-```
-
-## 📚 Command Reference
-
-| Command | Purpose | Example |
-|---------|---------|---------|
-| `create` | Create database with schema | `create users.fxdb --schema "id int, name string64"` |
-| `insert` | Add data to database | `insert users.fxdb --data '{"id": 1, "name": "Alice"}'` |
-| `read` | Display data | `read users.fxdb --limit 10` |
-| `info` | Show database information | `info users.fxdb` |
-| `dump` | Export data | `dump users.fxdb --format csv` |
-| `list` | List database files | `list --directory /path/to/databases` |
-| `help` | Show help | `help create` |
-| `types` | Show data types | `types` |
-
-## 🚀 Performance Features
-
-- **Optimized Row Sizes** - Smart type selection reduces storage by 60-70%
-- **Benchmark Suite** - Hyperfine integration with JSON reporting
-- **Memory Efficiency** - Precise type sizing minimizes memory usage
-- **Cross-Platform** - Optimized builds for each target platform
+- **Mobile Builds**: Size-optimized (`-Os`), reduced feature set, linenoise integration
+- **Desktop Builds**: Performance-optimized (`-O2`), full terminal integration
+- **Cross-Platform**: Consistent API, platform-adaptive implementations
 
 ## 🤝 Contributing
 
 FlexonDB uses modern CMake development practices:
 
-1. Use `cmake --preset dev-debug` for development
-2. Run `make -f Makefile.dev test` before committing
-3. Follow the existing code style and testing patterns
-4. Add tests for new features
+1. **Use cross-platform builds**: `./scripts/build_all.sh host`
+2. **Run comprehensive tests**: `cmake --build build --target test-all`
+3. **Follow modular architecture**: Each module has its own CMakeLists.txt
+4. **Test on multiple platforms**: Use toolchains for cross-compilation
+5. **Maintain compatibility**: Ensure builds work on all supported platforms
+
+## 🌍 Cross-Platform Deployment
+
+### Distribution Structure
+
+```
+dist/
+├── linux/          # Linux x86_64 binaries
+├── macos/          # macOS universal binaries
+├── windows/        # Windows x64 binaries
+├── android/        # Android ARM64 binaries
+└── ios/            # iOS ARM64 binaries
+```
+
+### Integration Examples
+
+```bash
+# Container deployment (Linux)
+FROM alpine:latest
+COPY dist/linux/bin/flexon /usr/local/bin/
+RUN chmod +x /usr/local/bin/flexon
+
+# macOS app bundle
+cp dist/macos/bin/flexon MyApp.app/Contents/MacOS/
+
+# Windows installer
+copy dist\windows\bin\flexon.exe "%ProgramFiles%\MyApp\"
+
+# Android APK integration
+cp dist/android/bin/flexon app/src/main/jniLibs/arm64-v8a/
+
+# iOS framework integration
+cp dist/ios/bin/flexon MyApp.framework/
+```
 
 ## 📄 License
 
@@ -258,4 +340,4 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
-**FlexonDB** - Modern database engine with enhanced developer experience 🚀
+**FlexonDB** - Modern cross-platform database engine with enhanced developer experience 🚀
